@@ -9,7 +9,7 @@ const PriceChart = ({ data, filters, dayRange }) => {
       const svg = d3.select(d3Container.current);
       svg.selectAll("*").remove(); // Clear SVG before redrawing
 
-      const margin = { top: 20, right: 120, bottom: 40, left: 60 };
+      const margin = { top: 20, right: 120, bottom: 40, left: 80 };
       const width = 800 - margin.left - margin.right;
       const height = 400 - margin.top - margin.bottom;
 
@@ -18,16 +18,34 @@ const PriceChart = ({ data, filters, dayRange }) => {
         .append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
 
-      const allValues = data.flatMap(d => d.values.map(v => v.price));
-      const yMax = d3.max(allValues);
+      const xDomain = dayRange || [1, 30];
       
+      const valuesInDomain = data.flatMap(d => 
+        d.values
+         .filter(v => v.day >= xDomain[0] && v.day <= xDomain[1])
+         .map(v => v.price)
+      );
+      
+      const yMax = d3.max(valuesInDomain) || 0; // Handle case with no data in domain
+
       const xScale = d3.scaleLinear()
-        .domain(dayRange || [1, 30]) // Use the dayRange prop for the x-axis domain
+        .domain(xDomain) // Use the xDomain for the x-axis
         .range([0, width]);
 
       const yScale = d3.scaleLinear()
         .domain([0, yMax * 1.1]) // Add some padding to the top
         .range([height, 0]);
+
+      const clipId = `chart-area-clip-${Math.random().toString(36).substr(2, 9)}`;
+
+      svg.append("defs").append("clipPath")
+        .attr("id", clipId)
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height);
+
+      const contentGroup = chart.append('g')
+        .attr('clip-path', `url(#${clipId})`);
 
       // Add Axes
       chart.append('g')
@@ -37,7 +55,7 @@ const PriceChart = ({ data, filters, dayRange }) => {
 
       chart.append('g')
         .attr('class', 'y-axis')
-        .call(d3.axisLeft(yScale).ticks(8).tickFormat(d => `${d.toFixed(2)}c`));
+        .call(d3.axisLeft(yScale).ticks(8).tickFormat(d3.format("~s")));
         
       svg.selectAll('.x-axis path, .y-axis path, .x-axis line, .y-axis line')
          .attr('stroke', '#4A5568');
@@ -49,8 +67,8 @@ const PriceChart = ({ data, filters, dayRange }) => {
       svg.selectAll('.domain').remove();
       
       // Add highlight rect for buy/sell period
-      if (filters.buyDay && filters.sellDay) {
-        chart.append('rect')
+      if (filters.showHighlight && filters.buyDay && filters.sellDay) {
+        contentGroup.append('rect')
           .attr('x', xScale(parseInt(filters.buyDay, 10)))
           .attr('y', 0)
           .attr('width', xScale(parseInt(filters.sellDay, 10)) - xScale(parseInt(filters.buyDay, 10)))
@@ -67,7 +85,7 @@ const PriceChart = ({ data, filters, dayRange }) => {
       const colors = d3.scaleOrdinal(d3.schemeCategory10);
 
       data.forEach((series, i) => {
-        chart.append('path')
+        contentGroup.append('path')
           .datum(series.values)
           .attr('fill', 'none')
           .attr('stroke', colors(i))
@@ -75,7 +93,7 @@ const PriceChart = ({ data, filters, dayRange }) => {
           .attr('d', line);
 
         const lastValue = series.values[series.values.length-1];
-        if (lastValue) {
+        if (lastValue && lastValue.day >= xDomain[0] && lastValue.day <= xDomain[1]) {
             chart.append('text')
             .attr('transform', `translate(${xScale(lastValue.day) + 5}, ${yScale(lastValue.price)})`)
             .attr('dy', '0.35em')
@@ -85,16 +103,40 @@ const PriceChart = ({ data, filters, dayRange }) => {
             .text(series.name);
         }
       });
+      
+      // Add Legend
+      const legend = chart.append('g')
+        .attr('transform', `translate(10, 10)`); // Position at top left inside chart area with padding
+
+      data.forEach((series, i) => {
+        const legendRow = legend.append('g')
+          .attr('transform', `translate(0, ${i * 20})`); // 20px spacing between legend items
+
+        legendRow.append('rect')
+          .attr('width', 10)
+          .attr('height', 10)
+          .attr('fill', colors(i));
+
+        legendRow.append('text')
+          .attr('x', 15)
+          .attr('y', 10)
+          .attr('text-anchor', 'start')
+          .style('fill', '#A0AEC0')
+          .style('font-size', '12px')
+          .text(series.name);
+      });
     }
   }, [data, filters, dayRange]);
 
   return (
     <div className="bg-gray-800 p-4 rounded-lg">
       <h3 className="text-lg font-bold text-white mb-2">Top Investment Candidates</h3>
-      <div className="w-full overflow-x-auto">
+      <div className="overflow-x-auto">
         <svg
           className="d3-component"
           ref={d3Container}
+          width="1200"
+          height="600"
         />
       </div>
     </div>
