@@ -8,6 +8,7 @@ function App() {
     sellDay: 14,
     minPrice: '',
     maxPrice: '',
+    showHighlight: true,
   });
 
   // This state will trigger the analysis when true
