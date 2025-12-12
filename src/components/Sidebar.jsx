@@ -3,10 +3,10 @@ import React from 'react';
 const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     onFilterChange({
       ...filters,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -21,10 +21,16 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
           <input type="number" id="buyDay" name="buyDay" value={filters.buyDay} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"/>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <label htmlFor="sellDay" className="block text-sm font-medium mb-1">Sell Day (e.g., Day 14)</label>
           <input type="number" id="sellDay" name="sellDay" value={filters.sellDay} onChange={handleChange} className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"/>
         </div>
+        
+        <div className="mb-6 flex items-center">
+            <input type="checkbox" id="showHighlight" name="showHighlight" checked={filters.showHighlight} onChange={handleChange} className="h-4 w-4 bg-gray-700 border-gray-600 rounded text-yellow-500 focus:ring-yellow-500" />
+            <label htmlFor="showHighlight" className="ml-2 text-sm font-medium">Show Buy/Sell Highlight</label>
+        </div>
+
 
         <div>
           <h4 className="font-medium mb-2">Budget (Chaos Orbs)</h4>
