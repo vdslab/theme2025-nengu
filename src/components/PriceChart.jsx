@@ -1,8 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import Tooltip from './Tooltip';
 
 const PriceChart = ({ data, filters, dayRange }) => {
   const d3Container = useRef(null);
+  const [tooltip, setTooltip] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    name: "",
+    day: null,
+    price: null,
+  });
 
   useEffect(() => {
     if (data && data.length > 0 && d3Container.current) {
@@ -26,14 +35,14 @@ const PriceChart = ({ data, filters, dayRange }) => {
          .map(v => v.price)
       );
       
-      const yMax = d3.max(valuesInDomain) || 0; // Handle case with no data in domain
+      const yMax = d3.max(valuesInDomain) || 0;
 
       const xScale = d3.scaleLinear()
-        .domain(xDomain) // Use the xDomain for the x-axis
+        .domain(xDomain)
         .range([0, width]);
 
       const yScale = d3.scaleLinear()
-        .domain([0, yMax * 1.1]) // Add some padding to the top
+        .domain([0, yMax * 1.1])
         .range([height, 0]);
 
       const clipId = `chart-area-clip-${Math.random().toString(36).substr(2, 9)}`;
@@ -66,7 +75,6 @@ const PriceChart = ({ data, filters, dayRange }) => {
          
       svg.selectAll('.domain').remove();
       
-      // Add highlight rect for buy/sell period
       if (filters.showHighlight && filters.buyDay && filters.sellDay) {
         contentGroup.append('rect')
           .attr('x', xScale(parseInt(filters.buyDay, 10)))
@@ -85,14 +93,46 @@ const PriceChart = ({ data, filters, dayRange }) => {
       const colors = d3.scaleOrdinal(d3.schemeCategory10);
 
       data.forEach((series, i) => {
+        // Visible line
         contentGroup.append('path')
           .datum(series.values)
           .attr('fill', 'none')
           .attr('stroke', colors(i))
           .attr('stroke-width', 2)
           .attr('d', line);
+          
+        // Hit area for tooltip
+        contentGroup.append("path")
+          .datum(series.values)
+          .attr("fill", "none")
+          .attr("stroke", "transparent")
+          .attr("stroke-width", 16)
+          .style("pointer-events", "stroke")
+          .attr("d", line)
+          .on("mousemove", (event) => {
+            const [mx] = d3.pointer(event);
+            const day = Math.round(xScale.invert(mx));
 
-        const lastValue = series.values[series.values.length-1];
+            const v = series.values.find(d => d.day === day);
+            if (!v) return;
+
+            const rect = d3Container.current.getBoundingClientRect();
+
+            setTooltip({
+              visible: true,
+              x: event.clientX - rect.left,
+              y: event.clientY - rect.top,
+              name: series.name,
+              day: v.day,
+              price: v.price,
+            });
+          })
+          .on("mouseleave", () =>
+            setTooltip(t => ({ ...t, visible: false }))
+          );
+
+        // Series label at the end of the line
+        const lastValue = series.values[series.values.length - 1];
         if (lastValue && lastValue.day >= xDomain[0] && lastValue.day <= xDomain[1]) {
             chart.append('text')
             .attr('transform', `translate(${xScale(lastValue.day) + 5}, ${yScale(lastValue.price)})`)
@@ -104,13 +144,12 @@ const PriceChart = ({ data, filters, dayRange }) => {
         }
       });
       
-      // Add Legend
       const legend = chart.append('g')
-        .attr('transform', `translate(10, 10)`); // Position at top left inside chart area with padding
+        .attr('transform', `translate(10, 10)`);
 
       data.forEach((series, i) => {
         const legendRow = legend.append('g')
-          .attr('transform', `translate(0, ${i * 20})`); // 20px spacing between legend items
+          .attr('transform', `translate(0, ${i * 20})`);
 
         legendRow.append('rect')
           .attr('width', 10)
@@ -131,13 +170,14 @@ const PriceChart = ({ data, filters, dayRange }) => {
   return (
     <div className="bg-gray-800 p-4 rounded-lg">
       <h3 className="text-lg font-bold text-white mb-2">Top Investment Candidates</h3>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <svg
           className="d3-component"
           ref={d3Container}
           width="1200"
           height="600"
         />
+        <Tooltip {...tooltip} />
       </div>
     </div>
   );
