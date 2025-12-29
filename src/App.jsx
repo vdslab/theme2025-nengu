@@ -25,8 +25,8 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex">
-      <aside className="w-64 h-screen sticky top-0">
+    <div className="min-h-screen bg-base-100 text-base-content flex">
+      <aside className="w-64 h-screen sticky top-0 bg-base-200">
         <Sidebar 
           filters={filters} 
           onFilterChange={handleFilterChange}

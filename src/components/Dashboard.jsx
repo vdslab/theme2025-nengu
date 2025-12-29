@@ -71,88 +71,150 @@ const Dashboard = ({ filters, analysisRequested }) => {
 
   return (
     <div className="p-4">
-      <div className="bg-gray-800 p-6 rounded-lg mb-4 text-white space-y-6">
-        {/* 追加：表示件数スライダー（1〜10） */}
-        <ItemCountSelector
-          value={itemCount}
-          min={1}
-          max={10}
-          onChange={setItemCount}
-        />
-
-        {/* 既存：dayRange スライダー */}
-        <div>
-          <label
-            htmlFor="day-range-slider"
-            className="block text-center text-lg mb-6"
-          >
-            Chart Display Range: Day {dayRange[0]} - {dayRange[1]}
-          </label>
-
-          <div className="px-4">
-            <Range
-              values={dayRange}
-              step={1}
-              min={1}
-              max={30}
-              onChange={(values) => setDayRange(values)}
-              renderTrack={({ props, children }) => (
-                <div
-                  onMouseDown={props.onMouseDown}
-                  onTouchStart={props.onTouchStart}
-                  style={{
-                    ...props.style,
-                    height: "36px",
-                    display: "flex",
-                    width: "100%",
-                  }}
-                >
-                  <div
-                    ref={props.ref}
-                    style={{
-                      height: "5px",
-                      width: "100%",
-                      borderRadius: "4px",
-                      background: `linear-gradient(to right, #4b5563 ${
-                        ((dayRange[0] - 1) / 29) * 100
-                      }%, #a78bfa ${((dayRange[0] - 1) / 29) * 100}%, #a78bfa ${
-                        ((dayRange[1] - 1) / 29) * 100
-                      }%, #4b5563 ${((dayRange[1] - 1) / 29) * 100}%)`,
-                      alignSelf: "center",
-                    }}
-                  >
-                    {children}
-                  </div>
-                </div>
-              )}
-              renderThumb={({ props }) => (
-                <div
-                  {...props}
-                  style={{
-                    ...props.style,
-                    height: "24px",
-                    width: "24px",
-                    borderRadius: "9999px",
-                    backgroundColor: "#FFF",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    boxShadow: "0px 2px 6px #AAA",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "12px",
-                      width: "12px",
-                      borderRadius: "9999px",
-                      backgroundColor: "#a78bfa",
-                    }}
-                  />
-                </div>
-              )}
-            />
-          </div>
+      <div className="bg-base-200 p-6 rounded-lg mb-4 text-base-content flex flex-wrap gap-6">
+        <div className="flex-1 min-w-[300px]">
+          {/* 追加：表示件数スライダー（1〜10） */}
+          <ItemCountSelector
+            value={itemCount}
+            min={1}
+            max={10}
+            onChange={setItemCount}
+          />
         </div>
+
+                <div className="flex-1 min-w-[300px]">
+
+                  {/* 既存：dayRange スライダー */}
+
+                  <div className="bg-base-300 p-4 rounded-lg">
+
+                    <div className="flex items-center justify-between mb-3">
+
+                      <label className="text-sm font-semibold">
+
+                        Chart Display Range
+
+                      </label>
+
+                      <div className="text-sm">
+
+                        Day {dayRange[0]} - {dayRange[1]}
+
+                      </div>
+
+                    </div>
+
+        
+
+                    <Range
+
+                      values={dayRange}
+
+                      step={1}
+
+                      min={1}
+
+                      max={30}
+
+                      onChange={(values) => setDayRange(values)}
+
+                                      renderTrack={({ props, children }) => (
+
+                                        // スライダーのトラック全体（イベントハンドラ用）
+
+                                        <div
+
+                                          onMouseDown={props.onMouseDown}
+
+                                          onTouchStart={props.onTouchStart}
+
+                                          style={{
+
+                                            ...props.style,
+
+                                            height: "36px",
+
+                                            display: "flex",
+
+                                            width: "100%",
+
+                                          }}
+
+                                        >
+
+                                          {/* スライダーのトラック（背景部分） */}
+
+                                          <div
+
+                                            ref={props.ref}
+
+                                            className="w-full h-1.5 self-center rounded-full bg-base-content/30 relative"
+
+                                          >
+
+                                            {/* スライダーの進捗部分 */}
+
+                                            <div
+
+                                              className="absolute h-full bg-primary"
+
+                                              style={{
+
+                                                left: `${((dayRange[0] - 1) / 29) * 100}%`,
+
+                                                right: `${100 - ((dayRange[1] - 1) / 29) * 100}%`,
+
+                                              }}
+
+                                            />
+
+                                            {children} {/* スライダーのつまみ（サム）がここに含まれます */}
+
+                                          </div>
+
+                                        </div>
+
+                                      )}
+
+                                      renderThumb={({ props }) => (
+
+                                        // スライダーのつまみ（外側）
+
+                                        <div
+
+                                          {...props}
+
+                                          style={{
+
+                                            ...props.style,
+
+                                          }}
+
+                                          className="h-6 w-6 rounded-full bg-primary shadow-md flex justify-center items-center"
+
+                                        >
+
+                                          {/* スライダーのつまみ（内側ドット） */}
+
+                                          <div className="h-3 w-3 rounded-full bg-base-100" />
+
+                                        </div>
+
+                                      )}
+
+                    />
+
+                    <div className="flex justify-between text-xs text-base-content/70 mt-2">
+
+                      <span>1</span>
+
+                      <span>30</span>
+
+                    </div>
+
+                  </div>
+
+                </div>
       </div>
 
 <PriceChart

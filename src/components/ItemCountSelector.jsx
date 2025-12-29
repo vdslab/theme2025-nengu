@@ -12,12 +12,12 @@ const ItemCountSelector = ({
   const percent = max === min ? 0 : ((clamped - min) / (max - min)) * 100;
 
   return (
-    <div className="bg-gray-700 p-4 rounded-lg">
+    <div className="bg-base-300 p-4 rounded-lg">
       <div className="flex items-center justify-between mb-3">
-        <label className="text-sm font-semibold text-white">
+        <label className="text-sm font-semibold">
           表示するアイテム数
         </label>
-        <div className="text-sm text-white">
+        <div className="text-sm">
           {clamped} 件
         </div>
       </div>
@@ -29,6 +29,7 @@ const ItemCountSelector = ({
         max={max}
         onChange={(values) => onChange(values[0])}
         renderTrack={({ props, children }) => (
+          // スライダーのトラック全体（イベントハンドラ用）
           <div
             onMouseDown={props.onMouseDown}
             onTouchStart={props.onTouchStart}
@@ -39,48 +40,36 @@ const ItemCountSelector = ({
               width: "100%",
             }}
           >
+            {/* スライダーのトラック（背景部分） */}
             <div
               ref={props.ref}
-              style={{
-                height: "6px",
-                width: "100%",
-                borderRadius: "9999px",
-                background: `linear-gradient(to right, #a78bfa 0%, #a78bfa ${percent}%, #4b5563 ${percent}%, #4b5563 100%)`,
-                alignSelf: "center",
-              }}
+              className="w-full h-1.5 self-center rounded-full bg-base-content/30 relative"
             >
-              {children}
+              {/* スライダーの進捗部分 */}
+              <div
+                className="absolute h-full rounded-full bg-primary"
+                style={{ width: `${percent}%` }}
+              />
+              {children} {/* スライダーのつまみ（サム）がここに含まれます */}
             </div>
           </div>
         )}
         renderThumb={({ props }) => (
+          // スライダーのつまみ（外側）
           <div
             {...props}
             style={{
               ...props.style,
-              height: "22px",
-              width: "22px",
-              borderRadius: "9999px",
-              backgroundColor: "#FFF",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              boxShadow: "0px 2px 6px #AAA",
             }}
+            className="h-6 w-6 rounded-full shadow-md flex justify-center items-center bg-primary"
           >
-            <div
-              style={{
-                height: "10px",
-                width: "10px",
-                borderRadius: "9999px",
-                backgroundColor: "#a78bfa",
-              }}
-            />
+            {/* スライダーのつまみ（内側ドット） */}
+            <div className="h-3 w-3 rounded-full bg-base-100 shadow-md" />
           </div>
         )}
       />
 
-      <div className="flex justify-between text-xs text-gray-300 mt-2">
+      <div className="flex justify-between text-xs text-base-content/70 mt-2">
         <span>{min}</span>
         <span>{max}</span>
       </div>
