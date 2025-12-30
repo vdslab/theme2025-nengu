@@ -54,19 +54,21 @@ const ItemCountSelector = ({
             </div>
           </div>
         )}
-        renderThumb={({ props }) => (
-          // スライダーのつまみ（外側）
-          <div
-            {...props}
-            style={{
-              ...props.style,
-            }}
-            className="h-6 w-6 rounded-full shadow-md flex justify-center items-center bg-primary"
-          >
-            {/* スライダーのつまみ（内側ドット） */}
-            <div className="h-3 w-3 rounded-full bg-base-100 shadow-md" />
-          </div>
-        )}
+        renderThumb={({ props, isDragged }) => {
+          const { key, style, ...restProps } = props; // key, style を分離
+          return (
+            // スライダーのつまみ（外側）
+            <div
+              key={key} // key は明示的に渡す
+              {...restProps} // 残りの props を展開
+              style={style} // style も明示的に渡す
+              className={`h-6 w-6 rounded-full shadow-md flex justify-center items-center cursor-grab ${isDragged ? 'bg-primary-focus' : 'bg-primary'}`}
+            >
+              {/* スライダーのつまみ（内側ドット） */}
+              <div className="h-3 w-3 rounded-full bg-base-100" />
+            </div>
+          );
+        }}
       />
 
       <div className="flex justify-between text-xs text-base-content/70 mt-2">

@@ -42,9 +42,12 @@ const Dashboard = ({ filters, analysisRequested }) => {
           const roi = (sellPrice - buyPrice) / buyPrice;
           return {
             name: item.name,
+            icon: item.icon,
             buyPrice,
             sellPrice,
             roi,
+            buyDay: buyDay,
+            sellDay: sellDay,
           };
         }
 
@@ -176,31 +179,35 @@ const Dashboard = ({ filters, analysisRequested }) => {
 
                                       )}
 
-                                      renderThumb={({ props }) => (
+                                                                      renderThumb={({ props, isDragged }) => {
 
-                                        // スライダーのつまみ（外側）
+                                                                        const { key, style, ...restProps } = props; // key, style を分離
 
-                                        <div
+                                                                        return (
 
-                                          {...props}
+                                                                          // スライダーのつまみ（外側）
 
-                                          style={{
+                                                                          <div
 
-                                            ...props.style,
+                                                                            key={key} // key は明示的に渡す
 
-                                          }}
+                                                                            {...restProps} // 残りの props を展開
 
-                                          className="h-6 w-6 rounded-full bg-primary shadow-md flex justify-center items-center"
+                                                                            style={style} // style も明示的に渡す
 
-                                        >
+                                                                            className={`h-6 w-6 rounded-full shadow-md flex justify-center items-center cursor-grab ${isDragged ? 'bg-primary-focus' : 'bg-primary'}`}
 
-                                          {/* スライダーのつまみ（内側ドット） */}
+                                                                          >
 
-                                          <div className="h-3 w-3 rounded-full bg-base-100" />
+                                                                            {/* スライダーのつまみ（内側ドット） */}
 
-                                        </div>
+                                                                            <div className="h-3 w-3 rounded-full bg-base-100" />
 
-                                      )}
+                                                                          </div>
+
+                                                                        );
+
+                                                                      }}
 
                     />
 
