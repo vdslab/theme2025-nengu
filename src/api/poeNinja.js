@@ -1,7 +1,12 @@
 // src/api/poeNinja.js
 export async function fetchPoeNinja({ endpoint, league, type }) {
-  const qs = new URLSearchParams({ endpoint, league, type });
-  const res = await fetch(`/.netlify/functions/poe-ninja?${qs.toString()}`);
+  // Direct URL to poe.ninja
+  const targetUrl = `https://poe.ninja/api/data/${endpoint}?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}`;
+  
+  // Use a CORS proxy to bypass browser restrictions without needing local server config changes
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+  
+  const res = await fetch(proxyUrl);
 
   const text = await res.text();
 
