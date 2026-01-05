@@ -6,6 +6,8 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [chartMode, setChartMode] = useState("price"); // "price" | "roi"
+
   const [tooltip, setTooltip] = useState({
     visible: false,
     x: 0,
@@ -13,11 +15,11 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     name: "",
     day: null,
     price: null,
-    league: "", // 他者の変更を取り込み
+    league: "",
+    roi: null, // Tooltip用にROIも保持
   });
 
   // Calculate colors based on item name hash to avoid duplicates and ensure consistency
-  // HEADのロジックを採用
   const getColor = (name) => {
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -69,21 +71,76 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
     const xDomain = dayRange || [1, 30];
+    const buyDay = parseInt(filters.buyDay, 10) || 1;
 
-    // 他者の変更を取り込み：安全な数値変換
-    const valuesInDomain = data.flatMap(s =>
-      (s.values || [])
-        .filter(v => v.day >= xDomain[0] && v.day <= xDomain[1])
-        .map(v => Number(v.price))
-        .filter(p => Number.isFinite(p))
-    );
+    // --- Data Preparation based on Mode ---
+    let renderData = [];
+    
+    if (chartMode === "price") {
+        renderData = data.map(series => ({
+            ...series,
+            renderValues: (series.values || [])
+                .filter(v => v.day >= xDomain[0] && v.day <= xDomain[1])
+                .map(v => ({ ...v, value: Number(v.price) }))
+                .filter(v => Number.isFinite(v.value))
+        }));
+    } else {
+        // ROI Mode
+        renderData = data.map(series => {
+            const values = series.values || [];
+            // Find base price at buyDay
+            // Using exact match first, could interpolate but simple find is safer for now
+            const basePoint = values.find(v => v.day === buyDay);
+            const basePrice = basePoint ? Number(basePoint.price) : null;
 
-    const yMaxRaw = d3.max(valuesInDomain);
-    const yMax = Number.isFinite(yMaxRaw) ? yMaxRaw : 0;
-    const yTop = Math.max(1, yMax * 1.1);
+            if (!basePrice || basePrice <= 0) return null; // Cannot calculate ROI
+
+            const renderValues = values
+                .filter(v => v.day >= xDomain[0] && v.day <= xDomain[1])
+                .map(v => {
+                    const price = Number(v.price);
+                    if (!Number.isFinite(price)) return null;
+                    const roi = ((price - basePrice) / basePrice) * 100;
+                    return { ...v, value: roi, originalPrice: price };
+                })
+                .filter(Boolean);
+
+            if (renderValues.length === 0) return null;
+
+            return { ...series, renderValues };
+        }).filter(Boolean);
+    }
+
+    if (renderData.length === 0 && chartMode === "roi") {
+        svg.append("text")
+           .attr("x", dimensions.width / 2)
+           .attr("y", dimensions.height / 2)
+           .attr("text-anchor", "middle")
+           .style("fill", "#A0AEC0")
+           .text(`No data available for ROI calculation based on Day ${buyDay}.`);
+        return;
+    }
+
+
+    // --- Scales ---
+    const allValues = renderData.flatMap(s => s.renderValues.map(v => v.value));
+    let yMin = d3.min(allValues);
+    let yMax = d3.max(allValues);
+    
+    // Add padding to Y domain
+    if (chartMode === "price") {
+        yMin = 0;
+        yMax = (yMax || 0) * 1.1;
+    } else {
+        // ROI mode: center around 0 if possible, or at least show negative
+        const padding = (yMax - yMin) * 0.1 || 10;
+        yMin = (yMin || 0) - padding;
+        yMax = (yMax || 0) + padding;
+    }
 
     const xScale = d3.scaleLinear().domain(xDomain).range([0, width]);
-    const yScale = d3.scaleLinear().domain([0, yTop]).range([height, 0]);
+    const yScale = d3.scaleLinear().domain([yMin, yMax]).range([height, 0]);
+
 
     // Clip Path
     const clipId = `chart-area-clip-${Math.random().toString(36).slice(2)}`;
@@ -99,30 +156,36 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     chart.append("g")
         .attr("class", "grid")
         .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(xScale)
-            .ticks(10)
-            .tickSize(-height)
-            .tickFormat("")
-        )
+        .call(d3.axisBottom(xScale).ticks(10).tickSize(-height).tickFormat("").tickPadding(10))
         .style("stroke-opacity", 0.1)
         .style("stroke", "white");
 
     // Grid lines (Y axis)
     chart.append("g")
         .attr("class", "grid")
-        .call(d3.axisLeft(yScale)
-            .ticks(8)
-            .tickSize(-width)
-            .tickFormat("")
-        )
+        .call(d3.axisLeft(yScale).ticks(8).tickSize(-width).tickFormat(""))
         .style("stroke-opacity", 0.1)
         .style("stroke", "white");
+    
+    // Zero line for ROI
+    if (chartMode === "roi") {
+        chart.append("line")
+            .attr("x1", 0)
+            .attr("x2", width)
+            .attr("y1", yScale(0))
+            .attr("y2", yScale(0))
+            .attr("stroke", "white")
+            .attr("stroke-opacity", 0.3)
+            .attr("stroke-dasharray", "4,4");
+    }
 
     const contentGroup = chart.append("g").attr("clip-path", `url(#${clipId})`);
 
     // Axes
     const xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d => `Day ${d}`);
-    const yAxis = d3.axisLeft(yScale).ticks(8).tickFormat(d3.format("~s"));
+    const yAxis = d3.axisLeft(yScale)
+        .ticks(8)
+        .tickFormat(d => chartMode === "roi" ? `${d > 0 ? '+' : ''}${d.toFixed(0)}%` : d3.format("~s")(d));
 
     chart.append("g")
       .attr("transform", `translate(0, ${height})`)
@@ -135,7 +198,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
       .attr("color", "#718096")
       .style("font-size", "11px");
 
-    // Highlight Range
+    // Highlight Range (only if valid)
     if (filters.showHighlight && filters.buyDay && filters.sellDay) {
       const xBuy = xScale(parseInt(filters.buyDay, 10));
       const xSell = xScale(parseInt(filters.sellDay, 10));
@@ -154,34 +217,28 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     const line = d3
       .line()
       .x(d => xScale(d.day))
-      .y(d => yScale(Number(d.price)))
-      .defined(d => Number.isFinite(Number(d.price))) // 安全性チェック
+      .y(d => yScale(d.value))
       .curve(d3.curveMonotoneX);
 
-    data.forEach((series) => {
+    renderData.forEach((series) => {
       const c = getColor(series.name);
-      
-      // 他者の変更を取り込み：リーグ情報の取得（存在する場合）
       const league = series.league || "";
 
-      // 値のフィルタリング
-      const seriesValues = (series.values || []).filter(
-        (v) => v.day >= xDomain[0] && v.day <= xDomain[1]
-      );
-      
-      if (seriesValues.length === 0) return;
+      if (series.renderValues.length === 0) return;
 
+      // Draw Line
       contentGroup
         .append("path")
-        .datum(seriesValues)
+        .datum(series.renderValues)
         .attr("fill", "none")
         .attr("stroke", c)
         .attr("stroke-width", 2)
         .attr("d", line);
 
+      // Hit Area
       contentGroup
         .append("path")
-        .datum(seriesValues)
+        .datum(series.renderValues)
         .attr("fill", "none")
         .attr("stroke", "transparent")
         .attr("stroke-width", 20)
@@ -190,7 +247,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
         .on("mousemove", (event) => {
           const [mx] = d3.pointer(event, contentGroup.node());
           const day = Math.round(xScale.invert(mx));
-          const v = seriesValues.find(d => d.day === day);
+          const v = series.renderValues.find(d => d.day === day);
           
           if (!v) return;
 
@@ -201,25 +258,53 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
             x: event.clientX - containerRect.left,
             y: event.clientY - containerRect.top,
             name: series.name,
-            league: league, // ツールチップに渡す
+            league: league,
             day: v.day,
-            price: Number(v.price),
+            price: chartMode === 'roi' ? v.originalPrice : v.value,
+            roi: chartMode === 'roi' ? v.value : null,
             color: c
           });
         })
         .on("mouseleave", () => setTooltip(t => ({ ...t, visible: false })));
     });
 
-  }, [data, filters, dayRange, dimensions]);
+  }, [data, filters, dayRange, dimensions, chartMode]);
 
   return (
     <div className="w-full h-full bg-base-200 rounded-lg shadow-inner flex flex-col p-4">
-       {/* Header with Title and Legend */}
+       {/* Header with Title, Toggle, and Legend */}
        <div className="flex-none flex flex-wrap items-center justify-between gap-4 mb-2">
-          <h3 className="text-xs font-bold text-base-content/50 uppercase tracking-widest">Price History</h3>
+          
+          <div className="flex items-center gap-4">
+              <h3 className="text-xs font-bold text-base-content/50 uppercase tracking-widest">Price History</h3>
+              
+              {/* Mode Toggle - Re-styled for better visibility */}
+              <div className="bg-black/40 p-1 rounded-lg flex gap-1 border border-white/10 shadow-lg">
+                  <button 
+                    className={`btn btn-xs no-animation px-4 rounded transition-all border-none ${
+                        chartMode === 'price' 
+                        ? 'bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]' 
+                        : 'bg-transparent text-base-content/50 hover:text-base-content/80'
+                    }`}
+                    onClick={() => setChartMode('price')}
+                  >
+                    Price
+                  </button>
+                  <button 
+                    className={`btn btn-xs no-animation px-4 rounded transition-all border-none ${
+                        chartMode === 'roi' 
+                        ? 'bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]' 
+                        : 'bg-transparent text-base-content/50 hover:text-base-content/80'
+                    }`}
+                    onClick={() => setChartMode('roi')}
+                  >
+                    ROI %
+                  </button>
+              </div>
+          </div>
           
           {/* Legend Section */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 justify-end flex-1">
              {data.map((series) => (
                <div key={`${series.name}-${series.league}`} className="flex items-center gap-1.5">
                   <div 
