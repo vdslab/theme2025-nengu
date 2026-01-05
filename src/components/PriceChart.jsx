@@ -13,18 +13,16 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     name: "",
     day: null,
     price: null,
+    league: "", // 他者の変更を取り込み
   });
 
   // Calculate colors based on item name hash to avoid duplicates and ensure consistency
+  // HEADのロジックを採用
   const getColor = (name) => {
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    // Generate HSL color:
-    // Hue: Distributed across 360 degrees
-    // Saturation: Fixed high value for visibility (e.g., 75%)
-    // Lightness: Fixed medium-high value for dark mode (e.g., 60%)
     const h = Math.abs(hash % 360);
     return `hsl(${h}, 75%, 60%)`;
   };
@@ -72,16 +70,20 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
 
     const xDomain = dayRange || [1, 30];
 
-    const valuesInDomain = data.flatMap(d =>
-      d.values
+    // 他者の変更を取り込み：安全な数値変換
+    const valuesInDomain = data.flatMap(s =>
+      (s.values || [])
         .filter(v => v.day >= xDomain[0] && v.day <= xDomain[1])
-        .map(v => v.price)
+        .map(v => Number(v.price))
+        .filter(p => Number.isFinite(p))
     );
 
-    const yMax = d3.max(valuesInDomain) || 0;
+    const yMaxRaw = d3.max(valuesInDomain);
+    const yMax = Number.isFinite(yMaxRaw) ? yMaxRaw : 0;
+    const yTop = Math.max(1, yMax * 1.1);
 
     const xScale = d3.scaleLinear().domain(xDomain).range([0, width]);
-    const yScale = d3.scaleLinear().domain([0, yMax * 1.1]).range([height, 0]);
+    const yScale = d3.scaleLinear().domain([0, yTop]).range([height, 0]);
 
     // Clip Path
     const clipId = `chart-area-clip-${Math.random().toString(36).slice(2)}`;
@@ -152,15 +154,26 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     const line = d3
       .line()
       .x(d => xScale(d.day))
-      .y(d => yScale(d.price))
+      .y(d => yScale(Number(d.price)))
+      .defined(d => Number.isFinite(Number(d.price))) // 安全性チェック
       .curve(d3.curveMonotoneX);
 
     data.forEach((series) => {
       const c = getColor(series.name);
+      
+      // 他者の変更を取り込み：リーグ情報の取得（存在する場合）
+      const league = series.league || "";
+
+      // 値のフィルタリング
+      const seriesValues = (series.values || []).filter(
+        (v) => v.day >= xDomain[0] && v.day <= xDomain[1]
+      );
+      
+      if (seriesValues.length === 0) return;
 
       contentGroup
         .append("path")
-        .datum(series.values)
+        .datum(seriesValues)
         .attr("fill", "none")
         .attr("stroke", c)
         .attr("stroke-width", 2)
@@ -168,7 +181,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
 
       contentGroup
         .append("path")
-        .datum(series.values)
+        .datum(seriesValues)
         .attr("fill", "none")
         .attr("stroke", "transparent")
         .attr("stroke-width", 20)
@@ -177,7 +190,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
         .on("mousemove", (event) => {
           const [mx] = d3.pointer(event, contentGroup.node());
           const day = Math.round(xScale.invert(mx));
-          const v = series.values.find(d => d.day === day);
+          const v = seriesValues.find(d => d.day === day);
           
           if (!v) return;
 
@@ -188,8 +201,9 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
             x: event.clientX - containerRect.left,
             y: event.clientY - containerRect.top,
             name: series.name,
+            league: league, // ツールチップに渡す
             day: v.day,
-            price: v.price,
+            price: Number(v.price),
             color: c
           });
         })
@@ -207,13 +221,13 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
           {/* Legend Section */}
           <div className="flex flex-wrap gap-x-4 gap-y-1">
              {data.map((series) => (
-               <div key={series.name} className="flex items-center gap-1.5">
+               <div key={`${series.name}-${series.league}`} className="flex items-center gap-1.5">
                   <div 
                     className="w-2.5 h-2.5 rounded-full" 
                     style={{ backgroundColor: getColor(series.name) }}
                   ></div>
                   <span className="text-[10px] font-medium text-base-content/70 whitespace-nowrap">
-                    {series.name}
+                    {series.name} {series.league ? `(${series.league})` : ""}
                   </span>
                </div>
              ))}

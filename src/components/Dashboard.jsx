@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Range } from "react-range";
 import PriceChart from "./PriceChart";
 import ItemTable from "./ItemTable";
 import { processedChartData } from "../data/processedData.js";
 
-const Dashboard = ({ filters, analysisRequested }) => {
+const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }) => {
   const [chartData, setChartData] = useState([]);
   const [tableData, setTableData] = useState([]);
   const [dayRange, setDayRange] = useState([1, 30]);
@@ -15,6 +15,7 @@ const Dashboard = ({ filters, analysisRequested }) => {
     if (!analysisRequested) return;
 
     const findPriceForDay = (values, day) => {
+      if (!Array.isArray(values)) return null;
       const dataPoint = values.find((v) => v.day === day);
       return dataPoint ? dataPoint.price : null;
     };
@@ -64,12 +65,33 @@ const Dashboard = ({ filters, analysisRequested }) => {
   }, [filters, analysisRequested]);
 
   // selectedItemNames が変わったら chartData を更新
+  // APIデータがある場合はAPIデータから、なければローカルデータから取得してマージ
   useEffect(() => {
-    const newChartData = processedChartData.filter((item) =>
-      selectedItemNames.includes(item.name)
-    );
-    setChartData(newChartData);
-  }, [selectedItemNames]);
+    let sourceData = processedChartData;
+
+    // APIデータが有効ならそちらを優先的に使用する（またはマージする）
+    // ここではシンプルに「APIデータにあればそれを使い、なければローカル」とする
+    if (Array.isArray(apiSeries) && apiSeries.length > 0) {
+        // APIデータにあるアイテム名
+        const apiNames = new Set(apiSeries.map(s => s.name));
+        
+        // 選択されたアイテムのうち、APIにあるもの
+        const fromApi = apiSeries.filter(item => selectedItemNames.includes(item.name));
+        
+        // 選択されたアイテムのうち、APIにないもの（ローカルから補完）
+        const fromLocal = processedChartData.filter(item => 
+            selectedItemNames.includes(item.name) && !apiNames.has(item.name)
+        );
+
+        setChartData([...fromApi, ...fromLocal]);
+    } else {
+        // APIがない場合はローカルのみ
+        const newChartData = processedChartData.filter((item) =>
+            selectedItemNames.includes(item.name)
+        );
+        setChartData(newChartData);
+    }
+  }, [selectedItemNames, apiSeries]);
 
   const toggleItemSelection = (itemName) => {
     setSelectedItemNames((prev) => {
@@ -88,6 +110,15 @@ const Dashboard = ({ filters, analysisRequested }) => {
   return (
     <div className="h-full flex flex-col p-4 gap-4 overflow-hidden">
       
+      {apiError && (
+        <div className="alert alert-error shadow-lg">
+          <div>
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{apiError}</span>
+          </div>
+        </div>
+      )}
+
       {/* --- Top Section: Chart (approx 45% height) --- */}
       <div className="h-[45%] flex flex-col min-h-[300px] gap-2">
         
