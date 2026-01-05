@@ -3,7 +3,9 @@ import * as d3 from "d3";
 import Tooltip from "./Tooltip";
 
 const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
-  const d3Container = useRef(null);
+  const containerRef = useRef(null);
+  const svgRef = useRef(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [tooltip, setTooltip] = useState({
     visible: false,
     x: 0,
@@ -13,23 +15,46 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     price: null,
   });
 
-  useEffect(() => {
-    if (!d3Container.current) return;
+  // Calculate colors based on item name hash to avoid duplicates and ensure consistency
+  const getColor = (name) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    // Generate HSL color:
+    // Hue: Distributed across 360 degrees
+    // Saturation: Fixed high value for visibility (e.g., 75%)
+    // Lightness: Fixed medium-high value for dark mode (e.g., 60%)
+    const h = Math.abs(hash % 360);
+    return `hsl(${h}, 75%, 60%)`;
+  };
 
-    const svg = d3.select(d3Container.current);
+  // Resize Observer to handle responsiveness
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const { width, height } = entries[0].contentRect;
+      setDimensions({ width, height });
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!svgRef.current || dimensions.width === 0 || dimensions.height === 0) return;
+
+    const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
     if (!data || data.length === 0) {
-      // データがない場合の表示
-      const margin = { top: 20, right: 20, bottom: 20, left: 20 };
-      const width = 800 - margin.left - margin.right;
-      const height = 400 - margin.top - margin.bottom;
-      
       svg
-        .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
         .append("text")
-        .attr("x", width / 2 + margin.left)
-        .attr("y", height / 2 + margin.top)
+        .attr("x", dimensions.width / 2)
+        .attr("y", dimensions.height / 2)
         .attr("text-anchor", "middle")
         .style("fill", "#A0AEC0")
         .style("font-size", "16px")
@@ -37,15 +62,11 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
       return;
     }
 
-    const margin = { top: 20, right: 120, bottom: 40, left: 80 };
-    const width = 800 - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
+    const margin = { top: 10, right: 20, bottom: 30, left: 60 };
+    const width = dimensions.width - margin.left - margin.right;
+    const height = dimensions.height - margin.top - margin.bottom;
 
     const chart = svg
-      .attr(
-        "viewBox",
-        `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`
-      )
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -62,14 +83,8 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     const xScale = d3.scaleLinear().domain(xDomain).range([0, width]);
     const yScale = d3.scaleLinear().domain([0, yMax * 1.1]).range([height, 0]);
 
-    // 色を「名前→色」で固定（ここが肝）
-    const domain = (colorDomain && colorDomain.length > 0)
-      ? Array.from(new Set(colorDomain))
-      : Array.from(new Set(data.map(s => s.name)));
-    const colors = d3.scaleOrdinal().domain(domain).range(d3.schemeCategory10);
-
+    // Clip Path
     const clipId = `chart-area-clip-${Math.random().toString(36).slice(2)}`;
-
     svg
       .append("defs")
       .append("clipPath")
@@ -78,44 +93,60 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
       .attr("width", width)
       .attr("height", height);
 
+    // Grid lines (X axis)
+    chart.append("g")
+        .attr("class", "grid")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(xScale)
+            .ticks(10)
+            .tickSize(-height)
+            .tickFormat("")
+        )
+        .style("stroke-opacity", 0.1)
+        .style("stroke", "white");
+
+    // Grid lines (Y axis)
+    chart.append("g")
+        .attr("class", "grid")
+        .call(d3.axisLeft(yScale)
+            .ticks(8)
+            .tickSize(-width)
+            .tickFormat("")
+        )
+        .style("stroke-opacity", 0.1)
+        .style("stroke", "white");
+
     const contentGroup = chart.append("g").attr("clip-path", `url(#${clipId})`);
 
     // Axes
-    chart
-      .append("g")
-      .attr("class", "x-axis")
+    const xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d => `Day ${d}`);
+    const yAxis = d3.axisLeft(yScale).ticks(8).tickFormat(d3.format("~s"));
+
+    chart.append("g")
       .attr("transform", `translate(0, ${height})`)
-      .call(d3.axisBottom(xScale).ticks(10).tickFormat(d => `Day ${d}`));
+      .call(xAxis)
+      .attr("color", "#718096") 
+      .style("font-size", "11px");
 
-    chart
-      .append("g")
-      .attr("class", "y-axis")
-      .call(d3.axisLeft(yScale).ticks(8).tickFormat(d3.format("~s")));
+    chart.append("g")
+      .call(yAxis)
+      .attr("color", "#718096")
+      .style("font-size", "11px");
 
-    svg
-      .selectAll(".x-axis path, .y-axis path, .x-axis line, .y-axis line")
-      .attr("stroke", "#4A5568");
-
-    svg
-      .selectAll(".x-axis text, .y-axis text")
-      .attr("fill", "#A0AEC0")
-      .style("font-size", "12px");
-
-    svg.selectAll(".domain").remove();
-
-    // highlight
+    // Highlight Range
     if (filters.showHighlight && filters.buyDay && filters.sellDay) {
-      contentGroup
-        .append("rect")
-        .attr("x", xScale(parseInt(filters.buyDay, 10)))
-        .attr("y", 0)
-        .attr(
-          "width",
-          xScale(parseInt(filters.sellDay, 10)) - xScale(parseInt(filters.buyDay, 10))
-        )
-        .attr("height", height)
-        .attr("fill", "green")
-        .attr("opacity", 0.1);
+      const xBuy = xScale(parseInt(filters.buyDay, 10));
+      const xSell = xScale(parseInt(filters.sellDay, 10));
+      
+      if (!isNaN(xBuy) && !isNaN(xSell)) {
+          contentGroup
+            .append("rect")
+            .attr("x", Math.min(xBuy, xSell))
+            .attr("y", 0)
+            .attr("width", Math.abs(xSell - xBuy))
+            .attr("height", height)
+            .attr("fill", "rgba(72, 187, 120, 0.15)");
+      }
     }
 
     const line = d3
@@ -124,11 +155,9 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
       .y(d => yScale(d.price))
       .curve(d3.curveMonotoneX);
 
-    // Lines
     data.forEach((series) => {
-      const c = colors(series.name);
+      const c = getColor(series.name);
 
-      // Visible line
       contentGroup
         .append("path")
         .datum(series.values)
@@ -137,77 +166,63 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
         .attr("stroke-width", 2)
         .attr("d", line);
 
-      // Hit area for tooltip
       contentGroup
         .append("path")
         .datum(series.values)
         .attr("fill", "none")
         .attr("stroke", "transparent")
-        .attr("stroke-width", 16)
-        .style("pointer-events", "stroke")
+        .attr("stroke-width", 20)
+        .style("cursor", "crosshair")
         .attr("d", line)
         .on("mousemove", (event) => {
-          const [mx] = d3.pointer(event);
+          const [mx] = d3.pointer(event, contentGroup.node());
           const day = Math.round(xScale.invert(mx));
-
           const v = series.values.find(d => d.day === day);
+          
           if (!v) return;
 
-          const rect = d3Container.current.getBoundingClientRect();
+          const containerRect = containerRef.current.getBoundingClientRect();
 
           setTooltip({
             visible: true,
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top,
+            x: event.clientX - containerRect.left,
+            y: event.clientY - containerRect.top,
             name: series.name,
             day: v.day,
             price: v.price,
+            color: c
           });
         })
         .on("mouseleave", () => setTooltip(t => ({ ...t, visible: false })));
-
-      // Label at end
-      const lastValue = series.values[series.values.length - 1];
-      if (lastValue && lastValue.day >= xDomain[0] && lastValue.day <= xDomain[1]) {
-        chart
-          .append("text")
-          .attr(
-            "transform",
-            `translate(${xScale(lastValue.day) + 5}, ${yScale(lastValue.price)})`
-          )
-          .attr("dy", "0.35em")
-          .attr("text-anchor", "start")
-          .style("fill", c)
-          .style("font-size", "12px")
-          .text(series.name);
-      }
     });
 
-    // Legend
-    const legend = chart.append("g").attr("transform", "translate(10, 10)");
-
-    data.forEach((series, i) => {
-      const legendRow = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
-      const c = colors(series.name);
-
-      legendRow.append("rect").attr("width", 10).attr("height", 10).attr("fill", c);
-
-      legendRow
-        .append("text")
-        .attr("x", 15)
-        .attr("y", 10)
-        .attr("text-anchor", "start")
-        .style("fill", "#A0AEC0")
-        .style("font-size", "12px")
-        .text(series.name);
-    });
-  }, [data, filters, dayRange, colorDomain]);
+  }, [data, filters, dayRange, dimensions]);
 
   return (
-    <div className="bg-gray-800 p-4 rounded-lg">
-      <h3 className="text-lg font-bold text-white mb-2">Top Investment Candidates</h3>
-      <div className="relative overflow-x-auto">
-        <svg className="d3-component" ref={d3Container} width="1200" height="600" />
+    <div className="w-full h-full bg-base-200 rounded-lg shadow-inner flex flex-col p-4">
+       {/* Header with Title and Legend */}
+       <div className="flex-none flex flex-wrap items-center justify-between gap-4 mb-2">
+          <h3 className="text-xs font-bold text-base-content/50 uppercase tracking-widest">Price History</h3>
+          
+          {/* Legend Section */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+             {data.map((series) => (
+               <div key={series.name} className="flex items-center gap-1.5">
+                  <div 
+                    className="w-2.5 h-2.5 rounded-full" 
+                    style={{ backgroundColor: getColor(series.name) }}
+                  ></div>
+                  <span className="text-[10px] font-medium text-base-content/70 whitespace-nowrap">
+                    {series.name}
+                  </span>
+               </div>
+             ))}
+          </div>
+       </div>
+
+      {/* SVG Container */}
+      <div ref={containerRef} className="flex-1 w-full min-h-0 relative">
+        <svg ref={svgRef} width={dimensions.width} height={dimensions.height} className="block" />
         <Tooltip {...tooltip} />
       </div>
     </div>

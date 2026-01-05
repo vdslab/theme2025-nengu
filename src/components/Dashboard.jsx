@@ -86,20 +86,15 @@ const Dashboard = ({ filters, analysisRequested }) => {
   );
 
   return (
-    <div className="p-4">
-      <div className="bg-base-200 p-6 rounded-lg mb-4 text-base-content flex flex-wrap gap-6">
-        <div className="flex-1 min-w-[300px]">
-          {/* 既存：dayRange スライダー */}
-          <div className="bg-base-300 p-4 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-semibold">
-                Chart Display Range
-              </label>
-              <div className="text-sm">
-                Day {dayRange[0]} - {dayRange[1]}
-              </div>
-            </div>
-
+    <div className="h-full flex flex-col p-4 gap-4 overflow-hidden">
+      
+      {/* --- Top Section: Chart (approx 45% height) --- */}
+      <div className="h-[45%] flex flex-col min-h-[300px] gap-2">
+        
+        {/* Chart Controls (Slider) */}
+        <div className="flex-none bg-base-200 px-4 py-2 rounded-lg shadow-sm flex items-center gap-4">
+           <span className="text-xs font-bold whitespace-nowrap opacity-70">Chart Range</span>
+           <div className="flex-1 mx-2 relative top-1">
             <Range
               values={dayRange}
               step={1}
@@ -107,23 +102,12 @@ const Dashboard = ({ filters, analysisRequested }) => {
               max={30}
               onChange={(values) => setDayRange(values)}
               renderTrack={({ props, children }) => (
-                // スライダーのトラック全体（イベントハンドラ用）
                 <div
                   onMouseDown={props.onMouseDown}
                   onTouchStart={props.onTouchStart}
-                  style={{
-                    ...props.style,
-                    height: "36px",
-                    display: "flex",
-                    width: "100%",
-                  }}
+                  style={{ ...props.style, height: "16px", display: "flex", width: "100%" }}
                 >
-                  {/* スライダーのトラック（背景部分） */}
-                  <div
-                    ref={props.ref}
-                    className="w-full h-1.5 self-center rounded-full bg-base-content/30 relative"
-                  >
-                    {/* スライダーの進捗部分 */}
+                  <div ref={props.ref} className="w-full h-1 self-center rounded-full bg-base-content/20 relative">
                     <div
                       className="absolute h-full bg-primary"
                       style={{
@@ -131,73 +115,93 @@ const Dashboard = ({ filters, analysisRequested }) => {
                         right: `${100 - ((dayRange[1] - 1) / 29) * 100}%`,
                       }}
                     />
-                    {children} {/* スライダーのつまみ（サム）がここに含まれます */}
+                    {children}
                   </div>
                 </div>
               )}
               renderThumb={({ props, isDragged }) => {
-                const { key, style, ...restProps } = props; // key, style を分離
-                return (
-                  // スライダーのつまみ（外側）
+                 const { key, style, ...restProps } = props; 
+                 return (
                   <div
-                    key={key} // key は明示的に渡す
-                    {...restProps} // 残りの props を展開
-                    style={style} // style も明示的に渡す
-                    className={`h-6 w-6 rounded-full shadow-md flex justify-center items-center cursor-grab ${
-                      isDragged ? "bg-primary-focus" : "bg-primary"
+                    key={key}
+                    {...restProps}
+                    style={style}
+                    className={`h-4 w-4 rounded-full shadow-sm flex justify-center items-center cursor-grab hover:scale-110 transition-transform ${
+                      isDragged ? "bg-primary-focus ring-2 ring-primary/50" : "bg-primary"
                     }`}
                   >
-                    {/* スライダーのつまみ（内側ドット） */}
-                    <div className="h-3 w-3 rounded-full bg-base-100" />
                   </div>
                 );
               }}
             />
-            <div className="flex justify-between text-xs text-base-content/70 mt-2">
-              <span>1</span>
-              <span>30</span>
-            </div>
-          </div>
+           </div>
+           <span className="text-xs font-mono opacity-70 min-w-[60px] text-right">{dayRange[0]} - {dayRange[1]}</span>
+        </div>
+
+        {/* Chart Display */}
+        <div className="flex-1 min-h-0 bg-base-200 rounded-lg shadow-inner overflow-hidden relative">
+             <PriceChart
+                data={chartData}
+                filters={filters}
+                dayRange={dayRange}
+                colorDomain={processedChartData.map((d) => d.name)}
+            />
         </div>
       </div>
 
-      <PriceChart
-        data={chartData}
-        filters={filters}
-        dayRange={dayRange}
-        colorDomain={processedChartData.map((d) => d.name)}
-      />
 
-      <div className="mt-4 flex justify-start items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search items..."
-          className="input input-bordered w-full max-w-xs bg-[#252833] border-gray-600 text-white focus:border-amber-500 focus:outline-none shadow-lg"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button
-          className="btn border-none bg-red-700 hover:bg-red-600 text-white shadow-lg min-w-[140px]"
-          onClick={() => setSelectedItemNames([])}
-        >
-          Clear Selection
-        </button>
-        <button
-          className="btn border-none bg-amber-600 hover:bg-amber-500 text-black font-bold shadow-lg min-w-[140px]"
-          onClick={() => {
-            const top10 = filteredTableData.slice(0, 10).map((item) => item.name);
-            setSelectedItemNames(top10);
-          }}
-        >
-          Select Top 10
-        </button>
+      {/* --- Bottom Section: Item Table (Remaining space) --- */}
+      <div className="flex-1 min-h-0 flex flex-col bg-base-200 rounded-lg shadow-xl overflow-hidden border border-white/5">
+        
+        {/* Table Toolbar & Header */}
+        <div className="p-3 border-b border-white/5 bg-base-300/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            {/* Title / Info */}
+            <div>
+                 <h3 className="font-bold text-base text-base-content/90">Top Candidates</h3>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center gap-2">
+                <input
+                    type="text"
+                    placeholder="Search items..."
+                    className="input input-sm input-bordered bg-base-100 border-white/10 w-48 focus:w-64 transition-all focus:border-amber-500"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <div className="h-4 w-px bg-white/10 mx-1"></div>
+                <div className="flex items-center gap-2">
+                    <button
+                        className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-red-900/50 text-red-400 hover:bg-red-900 hover:text-white hover:border-red-600 min-w-[70px] transition-all"
+                        onClick={() => setSelectedItemNames([])}
+                        title="Deselect All"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-amber-900/50 text-amber-500 hover:bg-amber-700 hover:text-black hover:border-amber-500 min-w-[100px] transition-all"
+                        onClick={() => {
+                            const top10 = filteredTableData.slice(0, 10).map((item) => item.name);
+                            setSelectedItemNames(top10);
+                        }}
+                        title="Select Top 10 by ROI"
+                    >
+                        Select Top 10
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {/* Scrollable Table Area */}
+        <div className="flex-1 overflow-auto relative">
+             <ItemTable
+                data={filteredTableData}
+                selectedItems={selectedItemNames}
+                onToggleItem={toggleItemSelection}
+            />
+        </div>
+
       </div>
-
-      <ItemTable
-        data={filteredTableData}
-        selectedItems={selectedItemNames}
-        onToggleItem={toggleItemSelection}
-      />
     </div>
   );
 };

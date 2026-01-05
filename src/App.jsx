@@ -33,7 +33,7 @@ function App() {
           onAnalyze={handleAnalyze}
         />
       </aside>
-      <main className="flex-1 h-screen overflow-y-auto">
+      <main className="flex-1 h-screen overflow-hidden">
         <Dashboard 
             filters={filters} 
             analysisRequested={analysisRequested} 
