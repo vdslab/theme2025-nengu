@@ -1,6 +1,6 @@
 import React from "react";
 
-const Tooltip = ({ visible, x, y, name, day, price }) => {
+const Tooltip = ({ visible, x, y, name, day, price, league }) => {
   if (!visible) return null;
 
   return (
@@ -14,6 +14,7 @@ const Tooltip = ({ visible, x, y, name, day, price }) => {
       }}
     >
       <div className="font-bold text-yellow-400">{name}</div>
+      <div className="opacity-80">{league}</div>
       <div>Day {day}</div>
       <div>{price.toFixed(2)} c</div>
     </div>

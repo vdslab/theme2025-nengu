@@ -58,7 +58,7 @@ async function fetchIconsForType(league, type, iconMap) {
                 success = true;
             }
         }
-    } catch (error) {
+    } catch  {
         // console.error(`Error fetching currencyoverview for ${type}:`, error.message);
     }
 
