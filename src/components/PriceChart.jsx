@@ -14,10 +14,28 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
   });
 
   useEffect(() => {
-    if (!data || data.length === 0 || !d3Container.current) return;
+    if (!d3Container.current) return;
 
     const svg = d3.select(d3Container.current);
     svg.selectAll("*").remove();
+
+    if (!data || data.length === 0) {
+      // データがない場合の表示
+      const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+      const width = 800 - margin.left - margin.right;
+      const height = 400 - margin.top - margin.bottom;
+      
+      svg
+        .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .append("text")
+        .attr("x", width / 2 + margin.left)
+        .attr("y", height / 2 + margin.top)
+        .attr("text-anchor", "middle")
+        .style("fill", "#A0AEC0")
+        .style("font-size", "16px")
+        .text("No items selected. Please select items from the table below.");
+      return;
+    }
 
     const margin = { top: 20, right: 120, bottom: 40, left: 80 };
     const width = 800 - margin.left - margin.right;

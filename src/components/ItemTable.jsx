@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ItemTable = ({ data }) => {
+const ItemTable = ({ data, selectedItems, onToggleItem }) => {
   // `filters` prop might be needed if buy/sell days are dynamic in the header
   // For now, we assume data contains what we need or we derive it.
   const buyDay = data.length > 0 && data[0].buyDay ? data[0].buyDay : 'X';
@@ -18,6 +18,9 @@ const ItemTable = ({ data }) => {
           {/* head */}
           <thead className="bg-base-300/50 text-base-content/70">
             <tr>
+              <th className="border-b border-r border-white/5 py-3 w-12 text-center">
+                {/* Checkbox Header - could be select all later */}
+              </th>
               <th className="border-b border-r border-white/5 py-3 font-semibold first:rounded-tl-none">Item Name</th>
               <th className="border-b border-r border-white/5 text-right py-3 font-semibold">Buy Price (Day {buyDay})</th>
               <th className="border-b border-r border-white/5 text-right py-3 font-semibold">Sell Price (Day {sellDay})</th>
@@ -27,7 +30,19 @@ const ItemTable = ({ data }) => {
           <tbody className="divide-y divide-white/5">
             {data && data.length > 0 ? (
               data.map((item) => (
-                <tr key={item.name} className="hover:bg-white/[0.02] transition-colors group">
+                <tr 
+                  key={item.name} 
+                  className="hover:bg-white/[0.05] transition-colors group cursor-pointer"
+                  onClick={() => onToggleItem(item.name)}
+                >
+                  <td className="border-r border-white/5 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm border-gray-500 bg-black/20 checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black] hover:border-amber-400 transition-all"
+                      checked={selectedItems.includes(item.name)}
+                      onChange={() => onToggleItem(item.name)}
+                    />
+                  </td>
                   <td className="border-r border-white/5 py-2.5">
                     <div className="flex items-center gap-3">
                       {item.icon && (
@@ -51,7 +66,7 @@ const ItemTable = ({ data }) => {
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="text-center p-12 text-base-content/30 italic">
+                <td colSpan="5" className="text-center p-12 text-base-content/30 italic">
                   No profitable items found for the selected criteria.
                 </td>
               </tr>
