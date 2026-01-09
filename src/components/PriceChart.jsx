@@ -79,6 +79,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     if (chartMode === "price") {
         renderData = data.map(series => ({
             ...series,
+            icon: series.icon,
             renderValues: (series.values || [])
                 .filter(v => v.day >= xDomain[0] && v.day <= xDomain[1])
                 .map(v => ({ ...v, value: Number(v.price) }))
@@ -107,7 +108,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
 
             if (renderValues.length === 0) return null;
 
-            return { ...series, renderValues };
+            return { ...series, icon: series.icon, renderValues };
         }).filter(Boolean);
     }
 
@@ -226,6 +227,20 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
 
       if (series.renderValues.length === 0) return;
 
+      let opacity = 1;
+      let strokeDash = "0";
+
+      // League differentiation logic
+      if (league && filters.selectedSourceLeagues && filters.selectedSourceLeagues.length > 0) {
+          const idx = filters.selectedSourceLeagues.indexOf(league);
+          if (idx !== -1) {
+              // 1st: 1.0, 2nd: 0.6, 3rd: 0.4 ...
+              opacity = Math.max(0.3, 1 - (idx * 0.4));
+              // Optional: Add dash pattern for secondary leagues to make it even clearer?
+              // if (idx > 0) strokeDash = "4,2";
+          }
+      }
+
       // Draw Line
       contentGroup
         .append("path")
@@ -233,6 +248,8 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
         .attr("fill", "none")
         .attr("stroke", c)
         .attr("stroke-width", 2)
+        .attr("stroke-opacity", opacity)
+        .attr("stroke-dasharray", strokeDash)
         .attr("d", line);
 
       // Hit Area
@@ -258,6 +275,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
             x: event.clientX - containerRect.left,
             y: event.clientY - containerRect.top,
             name: series.name,
+            icon: series.icon, // Pass icon
             league: league,
             day: v.day,
             price: chartMode === 'roi' ? v.originalPrice : v.value,

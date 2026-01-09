@@ -22,11 +22,22 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
 
     const buyDay = parseInt(filters.buyDay, 10);
     const sellDay = parseInt(filters.sellDay, 10);
+    
+    // Determine which dataset to use for main filtering/sorting
+    const sourceLeagues = filters.selectedSourceLeagues || [];
+    const useAverage = sourceLeagues.length === 0 || sourceLeagues.includes("Average");
+    const primaryLeague = useAverage ? "Average" : sourceLeagues[0];
 
     const results = processedChartData
       .map((item) => {
-        const buyPrice = findPriceForDay(item.values, buyDay);
-        const sellPrice = findPriceForDay(item.values, sellDay);
+        let targetValues = item.values; // Default to average
+        
+        if (!useAverage && item.leagues && item.leagues[primaryLeague]) {
+             targetValues = item.leagues[primaryLeague];
+        }
+
+        const buyPrice = findPriceForDay(targetValues, buyDay);
+        const sellPrice = findPriceForDay(targetValues, sellDay);
 
         // Budget filtering
         if (
@@ -47,6 +58,8 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
             roi,
             buyDay: buyDay,
             sellDay: sellDay,
+            values: item.values, // Pass average values always for reference if needed
+            leagues: item.leagues, // Pass through league data
           };
         }
 
@@ -67,8 +80,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
   // selectedItemNames が変わったら chartData を更新
   // APIデータがある場合はAPIデータから、なければローカルデータから取得してマージ
   useEffect(() => {
-    let sourceData = processedChartData;
-
     // APIデータが有効ならそちらを優先的に使用する（またはマージする）
     // ここではシンプルに「APIデータにあればそれを使い、なければローカル」とする
     if (Array.isArray(apiSeries) && apiSeries.length > 0) {
@@ -86,12 +97,42 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
         setChartData([...fromApi, ...fromLocal]);
     } else {
         // APIがない場合はローカルのみ
-        const newChartData = processedChartData.filter((item) =>
-            selectedItemNames.includes(item.name)
-        );
-        setChartData(newChartData);
+        const sourceLeagues = filters.selectedSourceLeagues || [];
+        
+        if (sourceLeagues.length > 0) {
+            // 選択されたリーグごとにシリーズを展開
+            const expandedData = [];
+            processedChartData.forEach(item => {
+                if (!selectedItemNames.includes(item.name)) return;
+                
+                sourceLeagues.forEach(league => {
+                    let values = null;
+                    if (league === "Average") {
+                        values = item.values;
+                    } else if (item.leagues && item.leagues[league]) {
+                        values = item.leagues[league];
+                    }
+
+                    if (values) {
+                        expandedData.push({
+                            name: item.name,
+                            icon: item.icon, // Add icon here
+                            league: league === "Average" ? "Average" : league,
+                            values: values
+                        });
+                    }
+                });
+            });
+            setChartData(expandedData);
+        } else {
+            // リーグ選択なし＝平均値を表示 (基本ここには来ないはずだがフォールバック)
+            const newChartData = processedChartData.filter((item) =>
+                selectedItemNames.includes(item.name)
+            );
+            setChartData(newChartData);
+        }
     }
-  }, [selectedItemNames, apiSeries]);
+  }, [selectedItemNames, apiSeries, filters.selectedSourceLeagues]);
 
   const toggleItemSelection = (itemName) => {
     setSelectedItemNames((prev) => {
@@ -229,6 +270,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
                 data={filteredTableData}
                 selectedItems={selectedItemNames}
                 onToggleItem={toggleItemSelection}
+                selectedSourceLeagues={filters.selectedSourceLeagues}
             />
         </div>
 

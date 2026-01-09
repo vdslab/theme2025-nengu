@@ -6,6 +6,7 @@ import { fetchSeriesForLeagues } from "./api/poeNinjaSeries";
 function App() {
   const [filters, setFilters] = useState({
     compareLeagues: "", // 他者の変更を取り込み
+    selectedSourceLeagues: ["Average"], // Local CSV leagues
     buyDay: 3,
     sellDay: 14,
     showHighlight: true,
