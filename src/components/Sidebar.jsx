@@ -14,14 +14,23 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
   const handleLeagueToggle = (league) => {
     const current = filters.selectedSourceLeagues || [];
     const newSelection = current.includes(league)
-        ? current.filter(l => l !== league)
-        : [...current, league];
-    
+      ? current.filter((l) => l !== league)
+      : [...current, league];
+
     onFilterChange({
-        ...filters,
-        selectedSourceLeagues: newSelection
+      ...filters,
+      selectedSourceLeagues: newSelection,
     });
   };
+
+  const setLiveWindowMode = (mode) => {
+    onFilterChange({
+      ...filters,
+      liveWindowMode: mode, // "all" | "last7"
+    });
+  };
+
+  const isKeepersOn = String(filters.compareLeagues ?? "").trim() === "Keepers";
 
   return (
     <div className="p-4 h-full flex flex-col">
@@ -32,45 +41,53 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 
         {/* Source Data Selection */}
         <div className="mb-6 p-4 bg-black/40 rounded-xl border border-white/10 shadow-inner">
-            <label className="block text-xs uppercase tracking-widest font-black mb-4 text-amber-500/80">
-                Source Data (Past Leagues)
-            </label>
-            <div className="space-y-3 ml-1">
-                {(() => {
-                    const leagueConfig = [
-                        { id: "Average", label: "Average (3 Leagues)" },
-                        { id: "Mercenaries", label: "Mercenaries (3.26)" },
-                        { id: "Settlers", label: "Settlers (3.25)" },
-                        { id: "Necropolis", label: "Necropolis (3.24)" }
-                    ];
-                    
-                    // CSVからデータが存在するリーグのみを表示（Averageは常に表示）
-                    const leaguesToList = leagueConfig.filter(config => 
-                        config.id === "Average" || (availableLeagues || []).includes(config.id)
-                    );
-                    
-                    return leaguesToList.map(config => (
-                        <label key={config.id} className="flex items-center gap-3 cursor-pointer group">
-                            <input 
-                                type="checkbox" 
-                                className="checkbox checkbox-sm border-2 border-white/20 bg-white/5 checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black] group-hover:border-amber-500/50 transition-all"
-                                checked={(filters.selectedSourceLeagues || []).includes(config.id)}
-                                onChange={() => handleLeagueToggle(config.id)}
-                            />
-                            <span className="text-sm font-bold opacity-70 group-hover:opacity-100 group-hover:text-amber-200 transition-all">
-                                {config.label}
-                            </span>
-                        </label>
-                    ));
-                })()}
-                
-                {(!availableLeagues || availableLeagues.length === 0) && (
-                     <div className="text-xs opacity-50">No local data available</div>
-                )}
-            </div>
-             <div className="text-[10px] opacity-40 mt-4 pl-1 leading-relaxed italic">
-                Select datasets to compare on the chart.
-            </div>
+          <label className="block text-xs uppercase tracking-widest font-black mb-4 text-amber-500/80">
+            Source Data (Past Leagues)
+          </label>
+
+          <div className="space-y-3 ml-1">
+            {(() => {
+              const leagueConfig = [
+                { id: "Average", label: "Average (3 Leagues)" },
+                { id: "Mercenaries", label: "Mercenaries (3.26)" },
+                { id: "Settlers", label: "Settlers (3.25)" },
+                { id: "Necropolis", label: "Necropolis (3.24)" },
+              ];
+
+              const leaguesToList = leagueConfig.filter(
+                (config) =>
+                  config.id === "Average" ||
+                  (availableLeagues || []).includes(config.id)
+              );
+
+              return leaguesToList.map((config) => (
+                <label
+                  key={config.id}
+                  className="flex items-center gap-3 cursor-pointer group"
+                >
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm border-2 border-white/20 bg-white/5 checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black] group-hover:border-amber-500/50 transition-all"
+                    checked={(filters.selectedSourceLeagues || []).includes(
+                      config.id
+                    )}
+                    onChange={() => handleLeagueToggle(config.id)}
+                  />
+                  <span className="text-sm font-bold opacity-70 group-hover:opacity-100 group-hover:text-amber-200 transition-all">
+                    {config.label}
+                  </span>
+                </label>
+              ));
+            })()}
+
+            {(!availableLeagues || availableLeagues.length === 0) && (
+              <div className="text-xs opacity-50">No local data available</div>
+            )}
+          </div>
+
+          <div className="text-[10px] opacity-40 mt-4 pl-1 leading-relaxed italic">
+            Select datasets to compare on the chart.
+          </div>
         </div>
 
         {/* Live Data (poe.ninja) */}
@@ -78,14 +95,18 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
           <label className="block text-xs uppercase tracking-widest font-black mb-3 text-amber-500/80">
             Live Data (poe.ninja API)
           </label>
-          {filters.compareLeagues === "Keepers" ? (
-            <div className="space-y-2">
+
+          {isKeepersOn ? (
+            <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/40 rounded-xl shadow-lg shadow-amber-500/5">
                 <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-amber-500 uppercase leading-none mb-1">Live Mode</span>
-                    <span className="text-sm font-bold text-white">Keepers</span>
+                  <span className="text-[10px] font-black text-amber-500 uppercase leading-none mb-1">
+                    Live Mode
+                  </span>
+                  <span className="text-sm font-bold text-white">Keepers</span>
                 </div>
-                <button 
+
+                <button
                   onClick={() => onFilterChange({ ...filters, compareLeagues: "" })}
                   className="btn btn-circle btn-ghost btn-xs text-error hover:bg-error/20"
                   title="Remove live data"
@@ -93,9 +114,48 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
                   ✕
                 </button>
               </div>
+
+              {/* ★追加：直近7日切り替え */}
+              <div className="p-3 bg-black/30 rounded-xl border border-white/10">
+                <div className="text-[10px] opacity-60 mb-2 uppercase tracking-widest font-black">
+                  Live Window
+                </div>
+
+                <div className="bg-black/40 p-1 rounded-lg flex gap-1 border border-white/10">
+                  <button
+                    className={`btn btn-xs no-animation px-3 rounded border-none ${
+                      filters.liveWindowMode === "all"
+                        ? "bg-amber-500 text-black font-extrabold"
+                        : "bg-transparent text-base-content/50 hover:text-base-content/80"
+                    }`}
+                    onClick={() => setLiveWindowMode("all")}
+                    type="button"
+                    title="Show all sparkline points"
+                  >
+                    All
+                  </button>
+
+                  <button
+                    className={`btn btn-xs no-animation px-3 rounded border-none ${
+                      filters.liveWindowMode === "last7"
+                        ? "bg-amber-500 text-black font-extrabold"
+                        : "bg-transparent text-base-content/50 hover:text-base-content/80"
+                    }`}
+                    onClick={() => setLiveWindowMode("last7")}
+                    type="button"
+                    title="Show last 7 points"
+                  >
+                    Last 7
+                  </button>
+                </div>
+
+                <div className="text-[10px] opacity-40 mt-2 leading-relaxed italic">
+                  "Last 7" shows the last 7 sparkline points (not league Day 1..7).
+                </div>
+              </div>
             </div>
           ) : (
-            <button 
+            <button
               type="button"
               onClick={() => {
                 onFilterChange({ ...filters, compareLeagues: "Keepers" });
@@ -106,6 +166,7 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
               Fetch Keepers Data
             </button>
           )}
+
           <div className="text-[10px] opacity-40 mt-3 px-1 leading-relaxed italic">
             Compare past trends with current Live league price action.
           </div>

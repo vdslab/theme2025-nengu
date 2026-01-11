@@ -1,91 +1,41 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Range } from "react-range";
 import PriceChart from "./PriceChart";
 import ItemTable from "./ItemTable";
 import { processedChartData } from "../data/processedData.js";
 
 const norm = (s) =>
-  String(s ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .replace(/s$/, "");
+  String(s ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, "").replace(/s$/, "");
 
-const findPriceForDay = (values, day) => {
-  if (!Array.isArray(values)) return null;
-  const p = values.find((v) => v.day === day);
-  return p ? p.price : null;
-};
-
-const takeLastNAndReindex = (values, n) => {
-  if (!Array.isArray(values) || values.length === 0) return [];
-  const tail = values.slice(-n);
-  return tail.map((v, i) => ({ ...v, day: i + 1 }));
-};
-
-const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }) => {
+const DashboardPast = ({
+  filters,
+  analysisRequested,
+  apiSeries = [],
+  apiError = "",
+}) => {
+  const [chartData, setChartData] = useState([]);
+  const [tableData, setTableData] = useState([]);
   const [dayRange, setDayRange] = useState([1, 30]);
   const [selectedItemNames, setSelectedItemNames] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const prevAnalysisRef = useRef(false);
 
-  const buyDay = useMemo(() => parseInt(filters.buyDay, 10), [filters.buyDay]);
-  const sellDay = useMemo(() => parseInt(filters.sellDay, 10), [filters.sellDay]);
+  useEffect(() => {
+    if (!analysisRequested) return;
 
-  // ローカルCSV：どのリーグを ROI 計算の主リーグにするか
-  const primaryLeague = useMemo(() => {
+    const findPriceForDay = (values, day) => {
+      if (!Array.isArray(values)) return null;
+      const dataPoint = values.find((v) => v.day === day);
+      return dataPoint ? dataPoint.price : null;
+    };
+
+    const buyDay = parseInt(filters.buyDay, 10);
+    const sellDay = parseInt(filters.sellDay, 10);
+
     const sourceLeagues = filters.selectedSourceLeagues || [];
     const useAverage = sourceLeagues.length === 0 || sourceLeagues.includes("Average");
-    return useAverage ? "Average" : sourceLeagues[0];
-  }, [filters.selectedSourceLeagues]);
-
-  // ---- 1) API（Keepers）表示用：all / last7 で値を切り替える ----
-  const apiSeriesForView = useMemo(() => {
-    if (!Array.isArray(apiSeries) || apiSeries.length === 0) return [];
-
-    if (filters.liveWindowMode !== "last7") return apiSeries;
-
-    return apiSeries
-      .map((s) => {
-        const values = takeLastNAndReindex(s.values, 7);
-        if (!values.length) return null;
-        return { ...s, values, windowDays: 7 };
-      })
-      .filter(Boolean);
-  }, [apiSeries, filters.liveWindowMode]);
-
-  // ---- 2) スライダー最大値：Keepers表示中は series の長さに追従（last7なら7） ----
-  const sliderMax = useMemo(() => {
-    if (apiSeriesForView.length > 0) {
-      const len = apiSeriesForView[0]?.values?.length ?? 0;
-      return len >= 2 ? len : 30;
-    }
-    return 30;
-  }, [apiSeriesForView]);
-
-  // Keepers表示ウィンドウを切り替えたら、dayRange を安全にクランプする
-  useEffect(() => {
-    setDayRange((prev) => {
-      const lo = Math.max(1, Math.min(sliderMax, prev[0]));
-      const hi = Math.max(1, Math.min(sliderMax, prev[1]));
-      const a = Math.min(lo, hi);
-      const b = Math.max(lo, hi);
-
-      // last7に切り替えた瞬間など、範囲が壊れてたら 1..sliderMax に寄せる
-      if (a === b) return [1, sliderMax];
-      return [a, b];
-    });
-  }, [sliderMax]);
-
-  // ---- 3) tableData（ローカルCSVのROIランキング）は前の機能そのまま ----
-  const tableData = useMemo(() => {
-    if (!analysisRequested) return [];
-
-    const minP = filters.minPrice ? parseFloat(filters.minPrice) : null;
-    const maxP = filters.maxPrice ? parseFloat(filters.maxPrice) : null;
-
-    const useAverage = primaryLeague === "Average";
+    const primaryLeague = useAverage ? "Average" : sourceLeagues[0];
 
     const results = processedChartData
       .map((item) => {
@@ -95,39 +45,41 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
           targetValues = item.leagues[primaryLeague];
         }
 
-        const b = findPriceForDay(targetValues, buyDay);
-        const s = findPriceForDay(targetValues, sellDay);
+        const buyPrice = findPriceForDay(targetValues, buyDay);
+        const sellPrice = findPriceForDay(targetValues, sellDay);
 
         if (
-          b === null ||
-          (minP !== null && b < minP) ||
-          (maxP !== null && b > maxP)
+          buyPrice === null ||
+          (filters.minPrice && buyPrice < parseFloat(filters.minPrice)) ||
+          (filters.maxPrice && buyPrice > parseFloat(filters.maxPrice))
         ) {
           return null;
         }
 
-        if (s === null) return null;
+        if (sellPrice !== null) {
+          const roi = (sellPrice - buyPrice) / buyPrice;
+          return {
+            name: item.name,
+            icon: item.icon,
+            buyPrice,
+            sellPrice,
+            roi,
+            buyDay,
+            sellDay,
+            values: item.values,
+            leagues: item.leagues,
+          };
+        }
 
-        const roi = (s - b) / b;
-
-        return {
-          name: item.name,
-          icon: item.icon,
-          buyPrice: b,
-          sellPrice: s,
-          roi,
-          buyDay,
-          sellDay,
-          values: item.values,
-          leagues: item.leagues,
-        };
+        return null;
       })
       .filter(Boolean);
 
-    return results.sort((a, b) => b.roi - a.roi);
-  }, [analysisRequested, filters.minPrice, filters.maxPrice, primaryLeague, buyDay, sellDay]);
+    const sorted = results.sort((a, b) => b.roi - a.roi);
+    setTableData(sorted);
+  }, [filters, analysisRequested]);
 
-  // Analyze立ち上がり時だけTop10
+  // Analyze の立ち上がり時だけ Top10 を初期選択（毎回リセットしない）
   useEffect(() => {
     const prev = prevAnalysisRef.current;
     const now = analysisRequested;
@@ -140,31 +92,26 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
     prevAnalysisRef.current = now;
   }, [analysisRequested, tableData]);
 
-  const filteredTableData = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return tableData;
-    return tableData.filter((item) => item.name.toLowerCase().includes(q));
-  }, [tableData, searchQuery]);
-
-  // ---- 4) chartData：APIがあれば API優先（切替後の apiSeriesForView を使う） ----
-  const chartData = useMemo(() => {
-    const sourceLeagues = filters.selectedSourceLeagues || [];
-
-    if (Array.isArray(apiSeriesForView) && apiSeriesForView.length > 0) {
+  // selectedItemNames が変わったら chartData を更新（APIがあればマージ）
+  useEffect(() => {
+    if (Array.isArray(apiSeries) && apiSeries.length > 0) {
       const selectedSet = new Set(selectedItemNames.map(norm));
 
-      const fromApi = apiSeriesForView.filter((s) => selectedSet.has(norm(s.name)));
+      const fromApi = apiSeries.filter((s) => selectedSet.has(norm(s.name)));
       const apiNormSet = new Set(fromApi.map((s) => norm(s.name)));
 
       const fromLocal = processedChartData.filter(
         (item) => selectedSet.has(norm(item.name)) && !apiNormSet.has(norm(item.name))
       );
 
-      return [...fromApi, ...fromLocal];
+      setChartData([...fromApi, ...fromLocal]);
+      return;
     }
 
+    const sourceLeagues = filters.selectedSourceLeagues || [];
+
     if (sourceLeagues.length > 0) {
-      const expanded = [];
+      const expandedData = [];
 
       processedChartData.forEach((item) => {
         if (!selectedItemNames.includes(item.name)) return;
@@ -172,32 +119,45 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
         sourceLeagues.forEach((league) => {
           let values = null;
 
-          if (league === "Average") values = item.values;
-          else if (item.leagues && item.leagues[league]) values = item.leagues[league];
+          if (league === "Average") {
+            values = item.values;
+          } else if (item.leagues && item.leagues[league]) {
+            values = item.leagues[league];
+          }
 
-          if (!values) return;
-
-          expanded.push({
-            name: item.name,
-            icon: item.icon,
-            league: league === "Average" ? "Average" : league,
-            values,
-          });
+          if (values) {
+            expandedData.push({
+              name: item.name,
+              icon: item.icon,
+              league: league === "Average" ? "Average" : league,
+              values,
+            });
+          }
         });
       });
 
-      return expanded;
+      setChartData(expandedData);
+      return;
     }
 
-    return processedChartData.filter((item) => selectedItemNames.includes(item.name));
-  }, [apiSeriesForView, filters.selectedSourceLeagues, selectedItemNames]);
+    const newChartData = processedChartData.filter((item) =>
+      selectedItemNames.includes(item.name)
+    );
+    setChartData(newChartData);
+  }, [selectedItemNames, apiSeries, filters.selectedSourceLeagues]);
 
   const toggleItemSelection = (itemName) => {
     setSelectedItemNames((prev) => {
-      if (prev.includes(itemName)) return prev.filter((n) => n !== itemName);
+      if (prev.includes(itemName)) {
+        return prev.filter((n) => n !== itemName);
+      }
       return [...prev, itemName];
     });
   };
+
+  const filteredTableData = tableData.filter((item) =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="h-full flex flex-col p-4 gap-4 overflow-hidden">
@@ -222,19 +182,17 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
         </div>
       )}
 
-      {/* --- Top: Chart --- */}
       <div className="h-[45%] flex flex-col min-h-[300px] gap-2">
         <div className="flex-none bg-base-200 px-4 py-2 rounded-lg shadow-sm flex items-center gap-4">
           <span className="text-xs font-bold whitespace-nowrap opacity-70">
             Chart Range
           </span>
-
           <div className="flex-1 mx-2 relative top-1">
             <Range
               values={dayRange}
               step={1}
               min={1}
-              max={sliderMax}
+              max={60}
               onChange={(values) => setDayRange(values)}
               renderTrack={({ props, children }) => (
                 <div
@@ -249,8 +207,8 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
                     <div
                       className="absolute h-full bg-primary"
                       style={{
-                        left: `${((dayRange[0] - 1) / Math.max(1, sliderMax - 1)) * 100}%`,
-                        right: `${100 - ((dayRange[1] - 1) / Math.max(1, sliderMax - 1)) * 100}%`,
+                        left: `${((dayRange[0] - 1) / 59) * 100}%`,
+                        right: `${100 - ((dayRange[1] - 1) / 59) * 100}%`,
                       }}
                     />
                     {children}
@@ -272,8 +230,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
               }}
             />
           </div>
-
-          <span className="text-xs font-mono opacity-70 min-w-[80px] text-right">
+          <span className="text-xs font-mono opacity-70 min-w-[90px] text-right">
             {dayRange[0]} - {dayRange[1]}
           </span>
         </div>
@@ -288,7 +245,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
         </div>
       </div>
 
-      {/* --- Bottom: Table --- */}
       <div className="flex-1 min-h-0 flex flex-col bg-base-200 rounded-lg shadow-xl overflow-hidden border border-white/5">
         <div className="p-3 border-b border-white/5 bg-base-300/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div>
@@ -312,7 +268,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
               >
                 Clear
               </button>
-
               <button
                 className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-amber-900/50 text-amber-500 hover:bg-amber-700 hover:text-black hover:border-amber-500 min-w-[120px] transition-all"
                 onClick={() => {
@@ -340,4 +295,4 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
   );
 };
 
-export default Dashboard;
+export default DashboardPast;

@@ -13,7 +13,7 @@ export async function fetchPoeNinja({ endpoint, league, type }) {
   let json;
   try {
     json = JSON.parse(text);
-  } catch (e) {
+  } catch {
     // JSONじゃない＝サーバが HTML を返してる等
     throw new Error(`Response is not JSON (HTTP ${res.status}). First 120 chars: ${text.slice(0, 120)}`);
   }

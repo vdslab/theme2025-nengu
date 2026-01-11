@@ -27,6 +27,13 @@ const toFiniteNumber = (x) => {
   return Number.isFinite(n) ? n : NaN;
 };
 
+// ★追加：最後のN点だけにして day を 1..N に振り直す
+const takeLastNAndReindex = (values, n) => {
+  if (!Array.isArray(values) || values.length === 0) return [];
+  const tail = values.slice(-n);
+  return tail.map((v, i) => ({ ...v, day: i + 1 }));
+};
+
 /**
  * currencyoverview の sparkline(data) は「%変化」なので、chaosEquivalent から価格推移を復元する
  */
@@ -48,7 +55,6 @@ const currencyLineToValues = (line, pick) => {
     .map((v) => toFiniteNumber(v))
     .map((v) => (Number.isFinite(v) ? v : null));
 
-  // 最後に有効な%（通常は totalChange と一致することが多い）
   let lastPct = null;
   for (let i = pctArr.length - 1; i >= 0; i -= 1) {
     if (pctArr[i] != null) {
@@ -60,7 +66,6 @@ const currencyLineToValues = (line, pick) => {
 
   const current = toFiniteNumber(line?.chaosEquivalent);
 
-  // current が取れない場合は「%のまま」でも一応描けるようにする
   if (!Number.isFinite(current)) {
     return pctArr
       .map((pct, i) => (pct == null ? null : { day: i + 1, price: pct }))
@@ -86,7 +91,8 @@ export async function fetchSeriesForLeagues({
   leaguesText,
   endpoint,
   type,
-  pick = "receive", // currencyoverview: receive/pay どっちを見るか
+  pick = "receive", // currencyoverview: receive/pay
+  windowDays = 7,   // ★追加：直近N点（Keepersは7固定で使う）
 }) {
   const leagues = parseLeagues(leaguesText);
   if (leagues.length === 0) return [];
@@ -97,7 +103,6 @@ export async function fetchSeriesForLeagues({
     const json = await fetchPoeNinja({ endpoint, league, type });
     const lines = Array.isArray(json?.lines) ? json.lines : [];
 
-    // デバッグ：本当に lines が来てるか
     console.log("[poeNinjaSeries]", { league, endpoint, type, lines: lines.length });
 
     const iconMap = buildIconMap(json);
@@ -111,7 +116,6 @@ export async function fetchSeriesForLeagues({
       if (endpoint === "currencyoverview") {
         values = currencyLineToValues(line, pick);
       } else {
-        // itemoverview 系（sparkline.data が価格のことが多い）
         const arr = line?.sparkline?.data;
         if (Array.isArray(arr) && arr.length > 0) {
           values = arr
@@ -125,13 +129,18 @@ export async function fetchSeriesForLeagues({
 
       if (!values.length) continue;
 
+      // ★ここで直近 windowDays 点に切る
+      const sliced = takeLastNAndReindex(values, windowDays);
+      if (!sliced.length) continue;
+
       const icon = line?.icon ?? iconMap.get(name) ?? null;
 
       out.push({
         name,
         icon,
-        league, // ← これが付くので Unknown にならない
-        values,
+        league,
+        values: sliced,
+        windowDays, // ★Dashboard側がスライダーを7に合わせるために持たせる
       });
     }
   }

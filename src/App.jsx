@@ -5,17 +5,19 @@ import { fetchSeriesForLeagues } from "./api/poeNinjaSeries";
 
 function App() {
   const [filters, setFilters] = useState({
-    compareLeagues: "", // 他者の変更を取り込み
-    selectedSourceLeagues: ["Average"], // Local CSV leagues
+    compareLeagues: "",
+    selectedSourceLeagues: ["Average"],
     buyDay: 3,
     sellDay: 14,
     showHighlight: true,
     minPrice: "",
     maxPrice: "",
+
+    // ★追加：Keepersの表示ウィンドウ切り替え
+    liveWindowMode: "all", // "all" | "last7"
   });
 
-  // Analyze を押したら true（フィルタ変更で false）
-  const [analysisRequested, setAnalysisRequested] = useState(false); // 初期値はfalseに変更（他者の変更に合わせる）
+  const [analysisRequested, setAnalysisRequested] = useState(false);
 
   const [apiSeries, setApiSeries] = useState([]);
   const [apiError, setApiError] = useState("");
@@ -24,20 +26,18 @@ function App() {
     setFilters(newFilters);
     setAnalysisRequested(false);
   };
-  
+
   const handleAnalyze = () => {
     console.log("[App] Analyze clicked");
     setAnalysisRequested(true);
   };
 
-  // ★ここが本体：analysisRequested が true になったら fetch する（他者の変更を取り込み）
   useEffect(() => {
     if (!analysisRequested) return;
 
     const leaguesText = String(filters.compareLeagues ?? "").trim();
     console.log("[App] analysisRequested=true leaguesText =", leaguesText);
 
-    // 空なら API 比較しない
     if (!leaguesText) {
       setApiSeries([]);
       setApiError("");
@@ -50,10 +50,13 @@ function App() {
       try {
         setApiError("");
 
+        // ★ここは「全部取る」。last7 は Dashboard 側で切る
         const series = await fetchSeriesForLeagues({
           leaguesText,
           endpoint: "currencyoverview",
           type: "Currency",
+          pick: "receive",
+          // windowDays は渡さない（全部ほしい）
         });
 
         console.log("[App] fetched api series:", series.length, series[0]);
@@ -74,7 +77,6 @@ function App() {
     };
   }, [analysisRequested, filters.compareLeagues]);
 
-  // apiSeries 更新確認
   useEffect(() => {
     console.log("[App] apiSeries updated:", apiSeries.length, apiSeries[0]);
   }, [apiSeries]);
@@ -82,18 +84,19 @@ function App() {
   return (
     <div className="min-h-screen bg-base-100 text-base-content flex">
       <aside className="w-64 h-screen sticky top-0 bg-base-200">
-        <Sidebar 
-          filters={filters} 
+        <Sidebar
+          filters={filters}
           onFilterChange={handleFilterChange}
           onAnalyze={handleAnalyze}
         />
       </aside>
+
       <main className="flex-1 h-screen overflow-hidden">
-        <Dashboard 
-            filters={filters} 
-            analysisRequested={analysisRequested} 
-            apiSeries={apiSeries}
-            apiError={apiError}
+        <Dashboard
+          filters={filters}
+          analysisRequested={analysisRequested}
+          apiSeries={apiSeries}
+          apiError={apiError}
         />
       </main>
     </div>
