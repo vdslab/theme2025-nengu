@@ -1,14 +1,93 @@
 import React from "react";
 import { availableLeagues } from "../data/processedData";
 
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
 const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
     onFilterChange({
       ...filters,
       [name]: type === "checkbox" ? checked : value,
     });
+  };
+
+  const setNumberField = (name, next) => {
+    onFilterChange({
+      ...filters,
+      [name]: next,
+    });
+  };
+
+  const NumberStepper = ({
+    label,
+    name,
+    value,
+    min = 1,
+    max = 60,
+    step = 1,
+    hint = "",
+  }) => {
+    const vNum = Number(value);
+    const safe = Number.isFinite(vNum) ? vNum : min;
+
+    return (
+      <div className="mb-4">
+        <label htmlFor={name} className="block text-sm font-medium mb-1">
+          {label}
+        </label>
+
+        <div className="join w-full">
+          <button
+            type="button"
+            className="btn btn-sm join-item bg-base-300 border-white/10"
+            onClick={() => setNumberField(name, clamp(safe - step, min, max))}
+            aria-label={`${label} minus`}
+          >
+            −
+          </button>
+
+          <input
+            id={name}
+            name={name}
+            type="number"
+            inputMode="numeric"
+            min={min}
+            max={max}
+            step={step}
+            value={value ?? ""}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n)) {
+                setNumberField(name, "");
+                return;
+              }
+              setNumberField(name, clamp(n, min, max));
+            }}
+            className={[
+              "input input-bordered input-primary join-item w-full",
+              "text-center font-mono",
+              // スピナーを消して見た目の「埋まり」を回避
+              "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+            ].join(" ")}
+            placeholder={`${min}..${max}`}
+          />
+
+          <button
+            type="button"
+            className="btn btn-sm join-item bg-base-300 border-white/10"
+            onClick={() => setNumberField(name, clamp(safe + step, min, max))}
+            aria-label={`${label} plus`}
+          >
+            ＋
+          </button>
+        </div>
+
+        {hint ? (
+          <div className="text-[11px] opacity-50 mt-1">{hint}</div>
+        ) : null}
+      </div>
+    );
   };
 
   const handleLeagueToggle = (league) => {
@@ -23,20 +102,15 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
     });
   };
 
-  const setLiveWindowMode = (mode) => {
-    onFilterChange({
-      ...filters,
-      liveWindowMode: mode, // "all" | "last7"
-    });
-  };
-
   const isKeepersOn = String(filters.compareLeagues ?? "").trim() === "Keepers";
 
   return (
-    <div className="p-4 h-full flex flex-col">
+    // ★ overflow-hidden にして、中身をスクロール領域化
+    <div className="p-4 h-full flex flex-col overflow-hidden">
       <h2 className="text-xl font-bold mb-6 text-primary">PoE Market Prophet</h2>
 
-      <div className="flex-1">
+      {/* ★ここをスクロール可能に */}
+      <div className="flex-1 overflow-y-auto pr-1">
         <h3 className="text-lg font-semibold mb-4">Investment Settings</h3>
 
         {/* Source Data Selection */}
@@ -68,9 +142,7 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm border-2 border-white/20 bg-white/5 checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black] group-hover:border-amber-500/50 transition-all"
-                    checked={(filters.selectedSourceLeagues || []).includes(
-                      config.id
-                    )}
+                    checked={(filters.selectedSourceLeagues || []).includes(config.id)}
                     onChange={() => handleLeagueToggle(config.id)}
                   />
                   <span className="text-sm font-bold opacity-70 group-hover:opacity-100 group-hover:text-amber-200 transition-all">
@@ -79,10 +151,6 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
                 </label>
               ));
             })()}
-
-            {(!availableLeagues || availableLeagues.length === 0) && (
-              <div className="text-xs opacity-50">No local data available</div>
-            )}
           </div>
 
           <div className="text-[10px] opacity-40 mt-4 pl-1 leading-relaxed italic">
@@ -90,69 +158,28 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
           </div>
         </div>
 
-        {/* Live Data (poe.ninja) */}
+        {/* Live Data (poe.ninja) - ここは既存のままでOK */}
         <div className="mb-6">
           <label className="block text-xs uppercase tracking-widest font-black mb-3 text-amber-500/80">
             Live Data (poe.ninja API)
           </label>
 
           {isKeepersOn ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/40 rounded-xl shadow-lg shadow-amber-500/5">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-amber-500 uppercase leading-none mb-1">
-                    Live Mode
-                  </span>
-                  <span className="text-sm font-bold text-white">Keepers</span>
-                </div>
-
-                <button
-                  onClick={() => onFilterChange({ ...filters, compareLeagues: "" })}
-                  className="btn btn-circle btn-ghost btn-xs text-error hover:bg-error/20"
-                  title="Remove live data"
-                >
-                  ✕
-                </button>
+            <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/40 rounded-xl shadow-lg shadow-amber-500/5">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-amber-500 uppercase leading-none mb-1">
+                  Live Mode
+                </span>
+                <span className="text-sm font-bold text-white">Keepers</span>
               </div>
-
-              {/* ★追加：直近7日切り替え */}
-              <div className="p-3 bg-black/30 rounded-xl border border-white/10">
-                <div className="text-[10px] opacity-60 mb-2 uppercase tracking-widest font-black">
-                  Live Window
-                </div>
-
-                <div className="bg-black/40 p-1 rounded-lg flex gap-1 border border-white/10">
-                  <button
-                    className={`btn btn-xs no-animation px-3 rounded border-none ${
-                      filters.liveWindowMode === "all"
-                        ? "bg-amber-500 text-black font-extrabold"
-                        : "bg-transparent text-base-content/50 hover:text-base-content/80"
-                    }`}
-                    onClick={() => setLiveWindowMode("all")}
-                    type="button"
-                    title="Show all sparkline points"
-                  >
-                    All
-                  </button>
-
-                  <button
-                    className={`btn btn-xs no-animation px-3 rounded border-none ${
-                      filters.liveWindowMode === "last7"
-                        ? "bg-amber-500 text-black font-extrabold"
-                        : "bg-transparent text-base-content/50 hover:text-base-content/80"
-                    }`}
-                    onClick={() => setLiveWindowMode("last7")}
-                    type="button"
-                    title="Show last 7 points"
-                  >
-                    Last 7
-                  </button>
-                </div>
-
-                <div className="text-[10px] opacity-40 mt-2 leading-relaxed italic">
-                  "Last 7" shows the last 7 sparkline points (not league Day 1..7).
-                </div>
-              </div>
+              <button
+                onClick={() => onFilterChange({ ...filters, compareLeagues: "" })}
+                className="btn btn-circle btn-ghost btn-xs text-error hover:bg-error/20"
+                title="Remove live data"
+                type="button"
+              >
+                ✕
+              </button>
             </div>
           ) : (
             <button
@@ -166,90 +193,86 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
               Fetch Keepers Data
             </button>
           )}
-
-          <div className="text-[10px] opacity-40 mt-3 px-1 leading-relaxed italic">
-            Compare past trends with current Live league price action.
-          </div>
         </div>
+<div className="grid grid-cols-2 gap-3">
+  <div>
+    <label htmlFor="buyDay" className="block text-sm font-medium mb-1">
+      Buy Day
+    </label>
+    <input
+      type="number"
+      id="buyDay"
+      name="buyDay"
+      value={filters.buyDay ?? ""}
+      onChange={handleChange}
+      className="input input-bordered input-primary w-full pr-3 bg-base-100 ring-1 ring-white/10"
+    />
+  </div>
 
-        <div className="mb-4">
-          <label htmlFor="buyDay" className="block text-sm font-medium mb-1">
-            Buy Day (e.g., Day 3)
-          </label>
-          <input
-            type="number"
-            id="buyDay"
-            name="buyDay"
-            value={filters.buyDay ?? ""}
-            onChange={handleChange}
-            className="input input-bordered input-primary w-full"
-          />
-        </div>
+  <div>
+    <label htmlFor="sellDay" className="block text-sm font-medium mb-1">
+      Sell Day
+    </label>
+    <input
+      type="number"
+      id="sellDay"
+      name="sellDay"
+      value={filters.sellDay ?? ""}
+      onChange={handleChange}
+      className="input input-bordered input-primary w-full pr-3 bg-base-100 ring-1 ring-white/10"
+    />
+  </div>
+</div>
 
-        <div className="mb-4">
-          <label htmlFor="sellDay" className="block text-sm font-medium mb-1">
-            Sell Day (e.g., Day 14)
-          </label>
-          <input
-            type="number"
-            id="sellDay"
-            name="sellDay"
-            value={filters.sellDay ?? ""}
-            onChange={handleChange}
-            className="input input-bordered input-primary w-full"
-          />
-        </div>
 
-        <div className="mb-6 flex items-center">
-          <input
-            type="checkbox"
-            id="showHighlight"
-            name="showHighlight"
-            checked={!!filters.showHighlight}
-            onChange={handleChange}
-            className="checkbox checkbox-primary"
-          />
-          <label htmlFor="showHighlight" className="ml-2 text-sm font-medium">
-            Show Buy/Sell Highlight
-          </label>
-        </div>
+{/* Budget */}
+<div>
+  <h4 className="font-medium mb-2">Budget (Chaos Orbs)</h4>
 
-        <div>
-          <h4 className="font-medium mb-2">Budget (Chaos Orbs)</h4>
+  <div className="flex items-center justify-between mb-2 gap-3">
+    <label htmlFor="minPrice" className="text-sm">
+      Min
+    </label>
+    <input
+      type="number"
+      id="minPrice"
+      name="minPrice"
+      value={filters.minPrice ?? ""}
+      onChange={handleChange}
+      placeholder="e.g., 100"
+      className="
+        input input-bordered input-primary w-2/3
+        pr-3 bg-base-100
+      "
+    />
+  </div>
 
-          <div className="flex items-center justify-between mb-2">
-            <label htmlFor="minPrice" className="text-sm">
-              Min
-            </label>
-            <input
-              type="number"
-              id="minPrice"
-              name="minPrice"
-              value={filters.minPrice ?? ""}
-              onChange={handleChange}
-              placeholder="e.g., 100"
-              className="input input-bordered input-primary w-2/3"
-            />
-          </div>
+  <div className="flex items-center justify-between gap-3">
+    <label htmlFor="maxPrice" className="text-sm">
+      Max
+    </label>
+    <input
+      type="number"
+      id="maxPrice"
+      name="maxPrice"
+      value={filters.maxPrice ?? ""}
+      onChange={handleChange}
+      placeholder="e.g., 5000"
+      className="
+        input input-bordered input-primary w-2/3
+        pr-3 bg-base-100
+      "
+    />
+  </div>
+</div>
 
-          <div className="flex items-center justify-between">
-            <label htmlFor="maxPrice" className="text-sm">
-              Max
-            </label>
-            <input
-              type="number"
-              id="maxPrice"
-              name="maxPrice"
-              value={filters.maxPrice ?? ""}
-              onChange={handleChange}
-              placeholder="e.g., 5000"
-              className="input input-bordered input-primary w-2/3"
-            />
-          </div>
-        </div>
+
+        {/* スクロール領域の下に少し余白（Analyzeに被らないように） */}
+        <div className="h-4" />
       </div>
 
-      <button onClick={onAnalyze} className="btn btn-primary w-full mt-6">
+      {/* 下の固定ボタン */}
+      <button onClick={onAnalyze} className="btn btn-primary w-full mt-4">
         Analyze
       </button>
     </div>

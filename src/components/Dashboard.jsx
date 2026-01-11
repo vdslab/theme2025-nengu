@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Range } from "react-range";
 import PriceChart from "./PriceChart";
 import ItemTable from "./ItemTable";
 import { processedChartData } from "../data/processedData.js";
 
+// API名とローカル名が微妙に違っても拾えるように正規化
 const norm = (s) =>
   String(s ?? "")
     .trim()
@@ -11,186 +12,130 @@ const norm = (s) =>
     .replace(/[^a-z0-9]/g, "")
     .replace(/s$/, "");
 
-const findPriceForDay = (values, day) => {
-  if (!Array.isArray(values)) return null;
-  const p = values.find((v) => v.day === day);
-  return p ? p.price : null;
-};
-
-const takeLastNAndReindex = (values, n) => {
-  if (!Array.isArray(values) || values.length === 0) return [];
-  const tail = values.slice(-n);
-  return tail.map((v, i) => ({ ...v, day: i + 1 }));
-};
-
 const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }) => {
-  const [dayRange, setDayRange] = useState([1, 30]);
+  const [chartData, setChartData] = useState([]);
+  const [tableData, setTableData] = useState([]);
+
+  // 7日/30日切替
+  const [windowPreset, setWindowPreset] = useState("7d"); // "7d" | "30d"
+  const windowMax = windowPreset === "7d" ? 7 : 30;
+
+  const [dayRange, setDayRange] = useState([1, windowMax]);
   const [selectedItemNames, setSelectedItemNames] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const prevAnalysisRef = useRef(false);
+  useEffect(() => {
+    setDayRange([1, windowMax]);
+  }, [windowMax]);
 
-  const buyDay = useMemo(() => parseInt(filters.buyDay, 10), [filters.buyDay]);
-  const sellDay = useMemo(() => parseInt(filters.sellDay, 10), [filters.sellDay]);
+  // ROIテーブル生成（既存ロジック維持）
+  useEffect(() => {
+    if (!analysisRequested) return;
 
-  // ローカルCSV：どのリーグを ROI 計算の主リーグにするか
-  const primaryLeague = useMemo(() => {
+    const findPriceForDay = (values, day) => {
+      if (!Array.isArray(values)) return null;
+      const dataPoint = values.find((v) => v.day === day);
+      return dataPoint ? dataPoint.price : null;
+    };
+
+    const buyDay = parseInt(filters.buyDay, 10);
+    const sellDay = parseInt(filters.sellDay, 10);
+
     const sourceLeagues = filters.selectedSourceLeagues || [];
     const useAverage = sourceLeagues.length === 0 || sourceLeagues.includes("Average");
-    return useAverage ? "Average" : sourceLeagues[0];
-  }, [filters.selectedSourceLeagues]);
-
-  // ---- 1) API（Keepers）表示用：all / last7 で値を切り替える ----
-  const apiSeriesForView = useMemo(() => {
-    if (!Array.isArray(apiSeries) || apiSeries.length === 0) return [];
-
-    if (filters.liveWindowMode !== "last7") return apiSeries;
-
-    return apiSeries
-      .map((s) => {
-        const values = takeLastNAndReindex(s.values, 7);
-        if (!values.length) return null;
-        return { ...s, values, windowDays: 7 };
-      })
-      .filter(Boolean);
-  }, [apiSeries, filters.liveWindowMode]);
-
-  // ---- 2) スライダー最大値：Keepers表示中は series の長さに追従（last7なら7） ----
-  const sliderMax = useMemo(() => {
-    if (apiSeriesForView.length > 0) {
-      const len = apiSeriesForView[0]?.values?.length ?? 0;
-      return len >= 2 ? len : 30;
-    }
-    return 30;
-  }, [apiSeriesForView]);
-
-  // Keepers表示ウィンドウを切り替えたら、dayRange を安全にクランプする
-  useEffect(() => {
-    setDayRange((prev) => {
-      const lo = Math.max(1, Math.min(sliderMax, prev[0]));
-      const hi = Math.max(1, Math.min(sliderMax, prev[1]));
-      const a = Math.min(lo, hi);
-      const b = Math.max(lo, hi);
-
-      // last7に切り替えた瞬間など、範囲が壊れてたら 1..sliderMax に寄せる
-      if (a === b) return [1, sliderMax];
-      return [a, b];
-    });
-  }, [sliderMax]);
-
-  // ---- 3) tableData（ローカルCSVのROIランキング）は前の機能そのまま ----
-  const tableData = useMemo(() => {
-    if (!analysisRequested) return [];
-
-    const minP = filters.minPrice ? parseFloat(filters.minPrice) : null;
-    const maxP = filters.maxPrice ? parseFloat(filters.maxPrice) : null;
-
-    const useAverage = primaryLeague === "Average";
+    const primaryLeague = useAverage ? "Average" : sourceLeagues[0];
 
     const results = processedChartData
       .map((item) => {
         let targetValues = item.values;
-
         if (!useAverage && item.leagues && item.leagues[primaryLeague]) {
           targetValues = item.leagues[primaryLeague];
         }
 
-        const b = findPriceForDay(targetValues, buyDay);
-        const s = findPriceForDay(targetValues, sellDay);
+        const buyPrice = findPriceForDay(targetValues, buyDay);
+        const sellPrice = findPriceForDay(targetValues, sellDay);
 
         if (
-          b === null ||
-          (minP !== null && b < minP) ||
-          (maxP !== null && b > maxP)
+          buyPrice === null ||
+          (filters.minPrice && buyPrice < parseFloat(filters.minPrice)) ||
+          (filters.maxPrice && buyPrice > parseFloat(filters.maxPrice))
         ) {
           return null;
         }
 
-        if (s === null) return null;
+        if (sellPrice !== null) {
+          const roi = (sellPrice - buyPrice) / buyPrice;
+          return {
+            name: item.name,
+            icon: item.icon,
+            buyPrice,
+            sellPrice,
+            roi,
+            buyDay,
+            sellDay,
+            values: item.values,
+            leagues: item.leagues,
+          };
+        }
 
-        const roi = (s - b) / b;
-
-        return {
-          name: item.name,
-          icon: item.icon,
-          buyPrice: b,
-          sellPrice: s,
-          roi,
-          buyDay,
-          sellDay,
-          values: item.values,
-          leagues: item.leagues,
-        };
+        return null;
       })
       .filter(Boolean);
 
-    return results.sort((a, b) => b.roi - a.roi);
-  }, [analysisRequested, filters.minPrice, filters.maxPrice, primaryLeague, buyDay, sellDay]);
+    const sorted = results.sort((a, b) => b.roi - a.roi);
+    setTableData(sorted);
 
-  // Analyze立ち上がり時だけTop10
+    const defaultSelected = sorted.slice(0, 10).map((r) => r.name);
+    setSelectedItemNames(defaultSelected);
+  }, [filters, analysisRequested]);
+
+  // ★ここが修正本体：過去リーグ展開 + Keepers(API) を両方チャートに載せる
   useEffect(() => {
-    const prev = prevAnalysisRef.current;
-    const now = analysisRequested;
-
-    if (!prev && now) {
-      const top10 = tableData.slice(0, 10).map((r) => r.name);
-      setSelectedItemNames(top10);
-    }
-
-    prevAnalysisRef.current = now;
-  }, [analysisRequested, tableData]);
-
-  const filteredTableData = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return tableData;
-    return tableData.filter((item) => item.name.toLowerCase().includes(q));
-  }, [tableData, searchQuery]);
-
-  // ---- 4) chartData：APIがあれば API優先（切替後の apiSeriesForView を使う） ----
-  const chartData = useMemo(() => {
     const sourceLeagues = filters.selectedSourceLeagues || [];
+    const leaguesToShow = sourceLeagues.length > 0 ? sourceLeagues : ["Average"];
 
-    if (Array.isArray(apiSeriesForView) && apiSeriesForView.length > 0) {
-      const selectedSet = new Set(selectedItemNames.map(norm));
+    const selectedSet = new Set(selectedItemNames.map(norm));
 
-      const fromApi = apiSeriesForView.filter((s) => selectedSet.has(norm(s.name)));
-      const apiNormSet = new Set(fromApi.map((s) => norm(s.name)));
+    // 1) ローカル（過去リーグ）を展開
+    const localExpanded = [];
+    processedChartData.forEach((item) => {
+      if (!selectedSet.has(norm(item.name))) return;
 
-      const fromLocal = processedChartData.filter(
-        (item) => selectedSet.has(norm(item.name)) && !apiNormSet.has(norm(item.name))
-      );
+      leaguesToShow.forEach((league) => {
+        let values = null;
 
-      return [...fromApi, ...fromLocal];
-    }
+        if (league === "Average") {
+          values = item.values;
+        } else if (item.leagues && item.leagues[league]) {
+          values = item.leagues[league];
+        }
 
-    if (sourceLeagues.length > 0) {
-      const expanded = [];
-
-      processedChartData.forEach((item) => {
-        if (!selectedItemNames.includes(item.name)) return;
-
-        sourceLeagues.forEach((league) => {
-          let values = null;
-
-          if (league === "Average") values = item.values;
-          else if (item.leagues && item.leagues[league]) values = item.leagues[league];
-
-          if (!values) return;
-
-          expanded.push({
+        if (values && values.length > 0) {
+          localExpanded.push({
             name: item.name,
             icon: item.icon,
             league: league === "Average" ? "Average" : league,
             values,
           });
-        });
+        }
       });
+    });
 
-      return expanded;
-    }
+    // 2) API（Keepers）を追加（名前はnormで照合）
+    const apiExpanded =
+      Array.isArray(apiSeries) && apiSeries.length > 0
+        ? apiSeries
+            .filter((s) => selectedSet.has(norm(s.name)))
+            .map((s) => ({
+              ...s,
+              // leagueが無い/空なら一応 "Keepers" に寄せる（あなたのfetchは league 付けてるので基本不要）
+              league: s.league || "Keepers",
+            }))
+        : [];
 
-    return processedChartData.filter((item) => selectedItemNames.includes(item.name));
-  }, [apiSeriesForView, filters.selectedSourceLeagues, selectedItemNames]);
+    // 3) 結合（Keepers + 過去リーグ）
+    setChartData([...apiExpanded, ...localExpanded]);
+  }, [selectedItemNames, apiSeries, filters.selectedSourceLeagues]);
 
   const toggleItemSelection = (itemName) => {
     setSelectedItemNames((prev) => {
@@ -198,6 +143,13 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
       return [...prev, itemName];
     });
   };
+
+  const filteredTableData = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return tableData.filter((item) => item.name.toLowerCase().includes(q));
+  }, [tableData, searchQuery]);
+
+  const denom = Math.max(1, windowMax - 1);
 
   return (
     <div className="h-full flex flex-col p-4 gap-4 overflow-hidden">
@@ -222,19 +174,44 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
         </div>
       )}
 
-      {/* --- Top: Chart --- */}
+      {/* --- Chart --- */}
       <div className="h-[45%] flex flex-col min-h-[300px] gap-2">
         <div className="flex-none bg-base-200 px-4 py-2 rounded-lg shadow-sm flex items-center gap-4">
           <span className="text-xs font-bold whitespace-nowrap opacity-70">
             Chart Range
           </span>
 
+          <div className="bg-black/30 p-1 rounded-lg flex gap-1 border border-white/10">
+            <button
+              type="button"
+              className={`btn btn-xs no-animation px-3 rounded border-none ${
+                windowPreset === "7d"
+                  ? "bg-amber-500 text-black font-extrabold"
+                  : "bg-transparent text-base-content/50 hover:text-base-content/80"
+              }`}
+              onClick={() => setWindowPreset("7d")}
+            >
+              7D
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs no-animation px-3 rounded border-none ${
+                windowPreset === "30d"
+                  ? "bg-amber-500 text-black font-extrabold"
+                  : "bg-transparent text-base-content/50 hover:text-base-content/80"
+              }`}
+              onClick={() => setWindowPreset("30d")}
+            >
+              30D
+            </button>
+          </div>
+
           <div className="flex-1 mx-2 relative top-1">
             <Range
               values={dayRange}
               step={1}
               min={1}
-              max={sliderMax}
+              max={windowMax}
               onChange={(values) => setDayRange(values)}
               renderTrack={({ props, children }) => (
                 <div
@@ -249,8 +226,8 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
                     <div
                       className="absolute h-full bg-primary"
                       style={{
-                        left: `${((dayRange[0] - 1) / Math.max(1, sliderMax - 1)) * 100}%`,
-                        right: `${100 - ((dayRange[1] - 1) / Math.max(1, sliderMax - 1)) * 100}%`,
+                        left: `${((dayRange[0] - 1) / denom) * 100}%`,
+                        right: `${100 - ((dayRange[1] - 1) / denom) * 100}%`,
                       }}
                     />
                     {children}
@@ -273,7 +250,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
             />
           </div>
 
-          <span className="text-xs font-mono opacity-70 min-w-[80px] text-right">
+          <span className="text-xs font-mono opacity-70 min-w-[90px] text-right">
             {dayRange[0]} - {dayRange[1]}
           </span>
         </div>
@@ -288,7 +265,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
         </div>
       </div>
 
-      {/* --- Bottom: Table --- */}
+      {/* --- Table --- */}
       <div className="flex-1 min-h-0 flex flex-col bg-base-200 rounded-lg shadow-xl overflow-hidden border border-white/5">
         <div className="p-3 border-b border-white/5 bg-base-300/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div>
@@ -308,18 +285,17 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "" }
               <button
                 className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-red-900/50 text-red-400 hover:bg-red-900 hover:text-white hover:border-red-600 min-w-[70px] transition-all"
                 onClick={() => setSelectedItemNames([])}
-                title="Deselect All"
+                type="button"
               >
                 Clear
               </button>
-
               <button
                 className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-amber-900/50 text-amber-500 hover:bg-amber-700 hover:text-black hover:border-amber-500 min-w-[120px] transition-all"
                 onClick={() => {
                   const top10 = filteredTableData.slice(0, 10).map((item) => item.name);
                   setSelectedItemNames(top10);
                 }}
-                title="Select Top 10 by ROI"
+                type="button"
               >
                 Select Top 10
               </button>
