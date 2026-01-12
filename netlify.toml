@@ -1,2 +1,8 @@
 [build]
   functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/ninja/*"
+  to = "https://poe.ninja/api/data/:splat"
+  status = 200
+  force = true

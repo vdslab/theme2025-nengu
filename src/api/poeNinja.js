@@ -1,29 +1,58 @@
-// src/api/poeNinja.js
 export async function fetchPoeNinja({ endpoint, league, type }) {
-  // Direct URL to poe.ninja
   const targetUrl = `https://poe.ninja/api/data/${endpoint}?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}`;
   
-  // Use a CORS proxy to bypass browser restrictions without needing local server config changes
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-  
-  const res = await fetch(proxyUrl);
+  // Try multiple methods to fetch data
+  const attempts = [
+    // 1. Local Proxy (Best for correctly configured Dev/Prod environments)
+    // Note: If this returns index.html (SPA fallback), we catch that error and try the next method.
+    `/api/ninja/${endpoint}?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}`,
+    
+    // 2. High performance CORS proxy
+    `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+    
+    // 3. Backup CORS proxy
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+  ];
 
-  const text = await res.text();
+  let lastError = null;
 
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    // JSONじゃない＝サーバが HTML を返してる等
-    throw new Error(`Response is not JSON (HTTP ${res.status}). First 120 chars: ${text.slice(0, 120)}`);
+  for (const url of attempts) {
+    try {
+      console.log("[fetchPoeNinja] Attempting fetch:", url);
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+
+      const text = await res.text();
+
+      // Check for HTML response (SPA fallback issue)
+      if (text.trim().startsWith("<!doctype html") || text.trim().startsWith("<html")) {
+        throw new Error("Received HTML content (likely SPA fallback or proxy error)");
+      }
+
+      try {
+        const json = JSON.parse(text);
+        // Basic validation of poe.ninja structure
+        if (json && (json.lines || json.currencyDetails)) {
+            console.log("[fetchPoeNinja] Success via:", url);
+            return json;
+        }
+        // If JSON is valid but empty/weird, maybe keep it, but let's be safe
+        return json;
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.slice(0, 50)}...`);
+      }
+
+    } catch (e) {
+      console.warn(`[fetchPoeNinja] Failed with ${url}:`, e.message);
+      lastError = e;
+      // Continue to next attempt
+    }
   }
 
-  if (!res.ok) {
-    const msg = json?.error ? json.error : `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return json;
+  throw new Error(`All fetch attempts failed. Last error: ${lastError?.message}`);
 }
 
 // poe.ninja の sparkline 配列を Day 1..N に変換
