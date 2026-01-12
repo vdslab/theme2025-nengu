@@ -12,6 +12,7 @@ function App() {
     showHighlight: true,
     minPrice: "",
     maxPrice: "",
+    currency: "chaos",
 
     // ★追加：Keepersの表示ウィンドウ切り替え
     liveWindowMode: "all", // "all" | "last7"
@@ -21,6 +22,7 @@ function App() {
 
   const [apiSeries, setApiSeries] = useState([]);
   const [apiError, setApiError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -49,6 +51,7 @@ function App() {
     (async () => {
       try {
         setApiError("");
+        setIsLoading(true);
 
         // ★ここは「全部取る」。last7 は Dashboard 側で切る
         const series = await fetchSeriesForLeagues({
@@ -69,6 +72,8 @@ function App() {
           setApiSeries([]);
           setApiError(msg);
         }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
 
@@ -97,6 +102,7 @@ function App() {
           analysisRequested={analysisRequested}
           apiSeries={apiSeries}
           apiError={apiError}
+          isLoading={isLoading}
         />
       </main>
     </div>

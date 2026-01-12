@@ -194,7 +194,7 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
             </button>
           )}
         </div>
-<div className="grid grid-cols-2 gap-3">
+<div className="grid grid-cols-2 gap-3 mb-6">
   <div>
     <label htmlFor="buyDay" className="block text-sm font-medium mb-1">
       Buy Day
@@ -225,46 +225,77 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 </div>
 
 
-{/* Budget */}
-<div>
-  <h4 className="font-medium mb-2">Budget (Chaos Orbs)</h4>
+        {/* Budget Filter */}
+        <div className="mb-6 p-4 bg-base-300/50 rounded-xl border border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-bold text-sm text-base-content/70 uppercase tracking-wider">
+              Budget & Currency
+            </h4>
+          </div>
 
-  <div className="flex items-center justify-between mb-2 gap-3">
-    <label htmlFor="minPrice" className="text-sm">
-      Min
-    </label>
-    <input
-      type="number"
-      id="minPrice"
-      name="minPrice"
-      value={filters.minPrice ?? ""}
-      onChange={handleChange}
-      placeholder="e.g., 100"
-      className="
-        input input-bordered input-primary w-2/3
-        pr-3 bg-base-100
-      "
-    />
-  </div>
+          {/* Currency Toggle */}
+          <div className="flex bg-black/20 p-1 rounded-lg border border-white/5 mb-4 relative ">
+            <button
+              type="button"
+              className={`flex-1 btn btn-xs border-none font-bold transition-all z-10 ${
+                filters.currency === "chaos"
+                  ? "bg-amber-500 text-black shadow-lg"
+                  : "bg-transparent text-base-content/50 hover:text-base-content"
+              }`}
+              onClick={() => onFilterChange({ ...filters, currency: "chaos" })}
+            >
+              Chaos (c)
+            </button>
+            <button
+              type="button"
+              className={`flex-1 btn btn-xs font-bold transition-all z-10 ${
+                filters.currency === "divine"
+                  ? "bg-amber-500 text-black shadow-lg border-none"
+                  : "bg-transparent text-base-content/50 hover:text-base-content"
+              }`}
+              onClick={() => onFilterChange({ ...filters, currency: "divine" })}
+            >
+              Divine (div)
+            </button>
+          </div>
 
-  <div className="flex items-center justify-between gap-3">
-    <label htmlFor="maxPrice" className="text-sm">
-      Max
-    </label>
-    <input
-      type="number"
-      id="maxPrice"
-      name="maxPrice"
-      value={filters.maxPrice ?? ""}
-      onChange={handleChange}
-      placeholder="e.g., 5000"
-      className="
-        input input-bordered input-primary w-2/3
-        pr-3 bg-base-100
-      "
-    />
-  </div>
-</div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label htmlFor="minPrice" className="block text-xs font-medium mb-1 opacity-70">Min Price</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="minPrice"
+                  name="minPrice"
+                  value={filters.minPrice ?? ""}
+                  onChange={handleChange}
+                  placeholder="0"
+                  className="input input-sm input-bordered w-full pr-8 bg-black/20 focus:bg-black/40 font-mono text-right"
+                />
+                <span className="absolute right-2 top-1.5 text-xs opacity-30 pointer-events-none">
+                  {filters.currency === 'divine' ? 'div' : 'c'}
+                </span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <label htmlFor="maxPrice" className="block text-xs font-medium mb-1 opacity-70">Max Price</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="maxPrice"
+                  name="maxPrice"
+                  value={filters.maxPrice ?? ""}
+                  onChange={handleChange}
+                  placeholder="∞"
+                  className="input input-sm input-bordered w-full pr-8 bg-black/20 focus:bg-black/40 font-mono text-right"
+                />
+                <span className="absolute right-2 top-1.5 text-xs opacity-30 pointer-events-none">
+                  {filters.currency === 'divine' ? 'div' : 'c'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
 
         {/* スクロール領域の下に少し余白（Analyzeに被らないように） */}

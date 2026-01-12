@@ -1,10 +1,11 @@
 import React from 'react';
 
-const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues }) => {
+const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, filters, convertPrice }) => {
   const buyDay = data.length > 0 && data[0].buyDay ? data[0].buyDay : 'X';
   const sellDay = data.length > 0 && data[0].sellDay ? data[0].sellDay : 'Y';
   
   const hasLeagues = selectedSourceLeagues && selectedSourceLeagues.length > 0;
+  const unitLabel = filters?.currency === 'divine' ? 'div' : 'c';
 
   const getPrice = (values, day) => {
       if (!values || !Array.isArray(values)) return 0;
@@ -24,14 +25,14 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues })
           {hasLeagues ? (
               selectedSourceLeagues.map(league => (
                   <React.Fragment key={league}>
-                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[100px]">
-                          Buy <span className="opacity-50 text-xs block">({league === "Average" ? "Avg" : league})</span>
+                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap">
+                          Buy <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
                       </th>
-                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[100px]">
-                          Sell <span className="opacity-50 text-xs block">({league === "Average" ? "Avg" : league})</span>
+                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap">
+                          Sell <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
                       </th>
-                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[80px]">
-                          ROI <span className="opacity-50 text-xs block">({league === "Average" ? "Avg" : league})</span>
+                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[90px] whitespace-nowrap">
+                          ROI <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
                       </th>
                   </React.Fragment>
               ))
@@ -84,17 +85,22 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues })
                           leagueValues = item.leagues ? item.leagues[league] : [];
                       }
 
-                      const bPrice = getPrice(leagueValues, item.buyDay);
-                      const sPrice = getPrice(leagueValues, item.sellDay);
+                      const rawBPrice = getPrice(leagueValues, item.buyDay);
+                      const rawSPrice = getPrice(leagueValues, item.sellDay);
+                      
+                      // Convert if helper is available
+                      const bPrice = convertPrice ? convertPrice(rawBPrice, item.buyDay, league) : rawBPrice;
+                      const sPrice = convertPrice ? convertPrice(rawSPrice, item.sellDay, league) : rawSPrice;
+
                       const lRoi = bPrice > 0 ? (sPrice - bPrice) / bPrice : 0;
                       
                       return (
                           <React.Fragment key={league}>
                               <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">
-                                {bPrice > 0 ? bPrice.toFixed(2) : '-'}c
+                                {bPrice > 0 ? bPrice.toFixed(2) : '-'}{unitLabel}
                               </td>
                               <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">
-                                {sPrice > 0 ? sPrice.toFixed(2) : '-'}c
+                                {sPrice > 0 ? sPrice.toFixed(2) : '-'}{unitLabel}
                               </td>
                               <td className={`text-right border-r border-white/5 font-bold text-sm ${lRoi > 0 ? 'text-green-400' : lRoi < 0 ? 'text-red-400' : 'text-base-content/50'}`}>
                                 {bPrice > 0 ? (lRoi * 100).toFixed(1) + '%' : '-'}
@@ -104,8 +110,8 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues })
                   })
               ) : (
                   <>
-                    <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">{item.buyPrice.toFixed(2)}c</td>
-                    <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">{item.sellPrice.toFixed(2)}c</td>
+                    <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">{item.buyPrice.toFixed(2)}{unitLabel}</td>
+                    <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">{item.sellPrice.toFixed(2)}{unitLabel}</td>
                     <td className={`text-right font-bold text-sm ${item.roi > 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {(item.roi * 100).toFixed(1)}%
                     </td>
@@ -126,5 +132,3 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues })
 };
 
 export default ItemTable;
-
-

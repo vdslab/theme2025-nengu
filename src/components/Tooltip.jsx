@@ -1,6 +1,6 @@
 import React from "react";
 
-const Tooltip = ({ visible, x, y, name, icon, day, price, league, roi }) => {
+const Tooltip = ({ visible, x, y, name, icon, day, price, league, roi, unit = "c" }) => {
   if (!visible) return null;
 
   return (
@@ -32,7 +32,7 @@ const Tooltip = ({ visible, x, y, name, icon, day, price, league, roi }) => {
           </div>
           <div className="flex justify-between gap-4">
               <span className="opacity-60">Price:</span>
-              <span className="text-amber-200">{price?.toFixed(2)} c</span>
+              <span className="text-amber-200">{price?.toFixed(2)} {unit}</span>
           </div>
           {roi !== null && roi !== undefined && (
              <div className="flex justify-between gap-4">

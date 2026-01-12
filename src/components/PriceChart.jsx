@@ -183,10 +183,11 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     const contentGroup = chart.append("g").attr("clip-path", `url(#${clipId})`);
 
     // Axes
+    const unitSuffix = filters.currency === 'divine' ? 'div' : 'c';
     const xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d => `Day ${d}`);
     const yAxis = d3.axisLeft(yScale)
         .ticks(8)
-        .tickFormat(d => chartMode === "roi" ? `${d > 0 ? '+' : ''}${d.toFixed(0)}%` : d3.format("~s")(d));
+        .tickFormat(d => chartMode === "roi" ? `${d > 0 ? '+' : ''}${d.toFixed(0)}%` : `${d3.format("~s")(d)}${unitSuffix}`);
 
     chart.append("g")
       .attr("transform", `translate(0, ${height})`)
@@ -280,7 +281,8 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
             day: v.day,
             price: chartMode === 'roi' ? v.originalPrice : v.value,
             roi: chartMode === 'roi' ? v.value : null,
-            color: c
+            color: c,
+            unit: filters.currency === 'divine' ? 'div' : 'c'
           });
         })
         .on("mouseleave", () => setTooltip(t => ({ ...t, visible: false })));
