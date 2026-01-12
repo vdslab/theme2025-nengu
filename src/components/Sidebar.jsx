@@ -107,7 +107,7 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
   return (
     // ★ overflow-hidden にして、中身をスクロール領域化
     <div className="p-4 h-full flex flex-col overflow-hidden">
-      <h2 className="text-xl font-bold mb-6 text-primary">PoE Market Prophet</h2>
+      <h2 className="text-xl font-bold mb-6 text-primary">Divine Insight</h2>
 
       {/* ★ここをスクロール可能に */}
       <div className="flex-1 overflow-y-auto pr-1">
