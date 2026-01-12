@@ -17,7 +17,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
   const [tableData, setTableData] = useState([]);
 
   // 7日/30日切替
-  const [windowPreset, setWindowPreset] = useState("7d"); // "7d" | "30d"
+  const [windowPreset, setWindowPreset] = useState("30d"); // "7d" | "30d"
   const windowMax = windowPreset === "7d" ? 7 : 30;
 
   const [dayRange, setDayRange] = useState([1, windowMax]);

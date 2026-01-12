@@ -6,7 +6,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [chartMode, setChartMode] = useState("price"); // "price" | "roi"
+  const [chartMode, setChartMode] = useState("roi"); // "price" | "roi"
 
   const [tooltip, setTooltip] = useState({
     visible: false,

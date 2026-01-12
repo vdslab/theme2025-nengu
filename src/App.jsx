@@ -18,7 +18,7 @@ function App() {
     liveWindowMode: "all", // "all" | "last7"
   });
 
-  const [analysisRequested, setAnalysisRequested] = useState(false);
+  const [analysisRequested, setAnalysisRequested] = useState(true);
 
   const [apiSeries, setApiSeries] = useState([]);
   const [apiError, setApiError] = useState("");
