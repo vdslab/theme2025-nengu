@@ -137,7 +137,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
     const sorted = results.sort((a, b) => b.roi - a.roi);
     setTableData(sorted);
 
-    const defaultSelected = sorted.slice(0, 10).map((r) => r.name);
+    const defaultSelected = sorted.slice(0, 5).map((r) => r.name);
     setSelectedItemNames(defaultSelected);
   }, [filters, analysisRequested, apiSeries]); // Added apiSeries to dependency as getDivinePrice depends on it
 
@@ -357,12 +357,12 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
               <button
                 className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-amber-900/50 text-amber-500 hover:bg-amber-700 hover:text-black hover:border-amber-500 min-w-[120px] transition-all"
                 onClick={() => {
-                  const top10 = filteredTableData.slice(0, 10).map((item) => item.name);
-                  setSelectedItemNames(top10);
+                  const top5 = filteredTableData.slice(0, 5).map((item) => item.name);
+                  setSelectedItemNames(top5);
                 }}
                 type="button"
               >
-                Select Top 10
+                Select Top 5
               </button>
             </div>
           </div>
