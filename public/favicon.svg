@@ -1,0 +1,20 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/> <!-- amber-400 -->
+      <stop offset="100%" stop-color="#b45309"/> <!-- amber-700 -->
+    </linearGradient>
+  </defs>
+  <!-- Dark Background Circle -->
+  <circle cx="32" cy="32" r="32" fill="#171717"/>
+  
+  <!-- Outer Gold Ring -->
+  <circle cx="32" cy="32" r="28" fill="none" stroke="url(#gold)" stroke-width="2"/>
+  
+  <!-- Eye Shape (Insight) -->
+  <path d="M12 32 C12 32 22 14 32 14 C42 14 52 32 52 32 C52 32 42 50 32 50 C22 50 12 32 12 32 Z" fill="url(#gold)"/>
+  
+  <!-- Pupil -->
+  <circle cx="32" cy="32" r="7" fill="#171717"/>
+  <circle cx="32" cy="32" r="3" fill="#fbbf24"/>
+</svg>
