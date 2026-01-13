@@ -13,6 +13,7 @@ const norm = (s) =>
     .replace(/s$/, "");
 
 const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", isLoading = false }) => {
+  console.log("Dashboard Render", filters.currency);
   const [chartData, setChartData] = useState([]);
   const [tableData, setTableData] = useState([]);
 
@@ -59,6 +60,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
 
   // Convert a raw chaos price to the target currency
   const convertPrice = (chaosPrice, day, league) => {
+      // console.log("convertPrice", chaosPrice, filters.currency); // Commented out to avoid spam, but useful for debug
       if (filters.currency !== "divine") return chaosPrice;
       const divPrice = getDivinePrice(day, league);
       if (!divPrice || divPrice === 0) return 0; // Avoid Infinity

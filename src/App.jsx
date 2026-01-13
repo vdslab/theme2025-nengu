@@ -25,8 +25,15 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFilterChange = (newFilters) => {
+    // Check if critical fields changed
+    const criticalKeys = ["compareLeagues", "buyDay", "sellDay", "minPrice", "maxPrice"];
+    const hasCriticalChange = criticalKeys.some(k => filters[k] !== newFilters[k]);
+
     setFilters(newFilters);
-    setAnalysisRequested(false);
+    
+    if (hasCriticalChange) {
+      setAnalysisRequested(false);
+    }
   };
 
   const handleAnalyze = () => {
