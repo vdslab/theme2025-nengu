@@ -25,14 +25,15 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
   const [selectedItemNames, setSelectedItemNames] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState({ key: 'roi', direction: 'desc' });
+
   useEffect(() => {
     setDayRange([1, windowMax]);
   }, [windowMax]);
 
   // Divine Orb Price Lookup Helper
   const getDivinePrice = (day, league) => {
-    // 1. Try to find in API series (Live)
-    // Check if the requested league matches the API series context or if it's "Keepers"
     if (league === "Keepers" || (apiSeries.length > 0 && apiSeries[0].league === league)) {
         const liveDiv = apiSeries.find(i => norm(i.name) === "divineorb");
         if (liveDiv) {
@@ -41,7 +42,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
         }
     }
 
-    // 2. Try to find in Local Processed Data
     const localDiv = processedChartData.find(i => norm(i.name) === "divineorb");
     if (localDiv) {
         let series = [];
@@ -55,15 +55,14 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
         if (p) return p;
     }
     
-    return null; // Return null if not found (implies cannot convert validly)
+    return null;
   };
 
   // Convert a raw chaos price to the target currency
   const convertPrice = (chaosPrice, day, league) => {
-      // console.log("convertPrice", chaosPrice, filters.currency); // Commented out to avoid spam, but useful for debug
       if (filters.currency !== "divine") return chaosPrice;
       const divPrice = getDivinePrice(day, league);
-      if (!divPrice || divPrice === 0) return 0; // Avoid Infinity
+      if (!divPrice || divPrice === 0) return 0;
       return chaosPrice / divPrice;
   };
 
@@ -97,12 +96,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
         const rawBuyPrice = findPriceForDay(targetValues, buyDay);
         const rawSellPrice = findPriceForDay(targetValues, sellDay);
 
-        // フィルタリングは Chaos ベースで行う (ユーザー入力がChaos想定の場合)
-        // もしユーザー入力もDivineベースにするならここで変換が必要だが、
-        // 既存実装の Budget Filter は "Currency (c)" と書いてあったのでChaosベースとして扱う。
-        // -> 今回UIで "Min Price (div)" 等に切り替わるようにしたので、入力値もその通貨基準とみなすべき。
-        // -> つまり、比較対象の `buyPrice` を `convertPrice` してから比較する。
-
         const buyPrice = rawBuyPrice !== null ? convertPrice(rawBuyPrice, buyDay, actualLeague) : null;
         const sellPrice = rawSellPrice !== null ? convertPrice(rawSellPrice, sellDay, actualLeague) : null;
 
@@ -124,10 +117,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
             roi,
             buyDay,
             sellDay,
-            values: targetValues, // Raw Chaos values (ItemTable needs raw to re-calc or we pass converted?) 
-            // ItemTable currently does calc internally for multi-league. 
-            // We should let ItemTable handle multi-league conversion if we want consistent display.
-            // For now, this `buyPrice` / `sellPrice` is for the "Summary" or sorting.
+            values: targetValues, 
             leagues: item.leagues,
           };
         }
@@ -139,9 +129,10 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
     const sorted = results.sort((a, b) => b.roi - a.roi);
     setTableData(sorted);
 
+    // Initial sort is handled by sortConfig default, but initial selection logic remains
     const defaultSelected = sorted.slice(0, 5).map((r) => r.name);
     setSelectedItemNames(defaultSelected);
-  }, [filters, analysisRequested, apiSeries]); // Added apiSeries to dependency as getDivinePrice depends on it
+  }, [filters, analysisRequested, apiSeries]);
 
   // チャートデータ生成
   useEffect(() => {
@@ -150,7 +141,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
 
     const selectedSet = new Set(selectedItemNames.map(norm));
 
-    // 1) ローカル（過去リーグ）を展開
     const localExpanded = [];
     processedChartData.forEach((item) => {
       if (!selectedSet.has(norm(item.name))) return;
@@ -165,7 +155,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
         }
 
         if (values && values.length > 0) {
-            // Apply conversion to entire series
             const convertedValues = values.map(v => ({
                 ...v,
                 price: convertPrice(v.price, v.day, league === "Average" ? "Average" : league)
@@ -181,7 +170,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
       });
     });
 
-    // 2) API（Keepers）を追加（名前はnormで照合）
     const apiExpanded =
       Array.isArray(apiSeries) && apiSeries.length > 0
         ? apiSeries
@@ -200,7 +188,6 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
             })
         : [];
 
-    // 3) 結合（Keepers + 過去リーグ）
     setChartData([...apiExpanded, ...localExpanded]);
   }, [selectedItemNames, apiSeries, filters.selectedSourceLeagues, filters.currency]);
 
@@ -215,6 +202,86 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
     const q = searchQuery.toLowerCase();
     return tableData.filter((item) => item.name.toLowerCase().includes(q));
   }, [tableData, searchQuery]);
+
+  // Sorting Logic
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'desc' };
+    });
+  };
+
+  const sortedTableData = useMemo(() => {
+    let data = [...filteredTableData];
+    if (!sortConfig.key) return data;
+
+    const { key, direction } = sortConfig;
+    const isAsc = direction === 'asc';
+
+    data.sort((a, b) => {
+      let valA, valB;
+
+      if (key === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (['buyPrice', 'sellPrice', 'roi'].includes(key)) {
+        valA = a[key] ?? -Infinity;
+        valB = b[key] ?? -Infinity;
+      } else {
+        // Dynamic keys: e.g. "Mercenaries_buy"
+        const parts = key.split('_');
+        const type = parts.pop(); // buy, sell, roi
+        const league = parts.join('_'); // handles cases like "Average" or "Mercenaries"
+
+        const getRaw = (item) => {
+            let values = [];
+            if (league === "Average") {
+                values = item.values || [];
+            } else {
+                values = item.leagues ? item.leagues[league] : [];
+            }
+            const day = type === 'buy' ? item.buyDay : item.sellDay;
+            const found = values?.find(v => v.day === day);
+            return found ? found.price : 0;
+        };
+
+        const rawA = getRaw(a);
+        const rawB = getRaw(b);
+
+        if (type === 'roi') {
+             // ROI needs both buy and sell to calc correctly
+             const getVals = (item) => {
+                 let vs = [];
+                 if (league === "Average") vs = item.values || [];
+                 else vs = item.leagues ? item.leagues[league] : [];
+                 
+                 const rb = vs?.find(v => v.day === item.buyDay)?.price || 0;
+                 const rs = vs?.find(v => v.day === item.sellDay)?.price || 0;
+                 // ROI is (Sell - Buy)/Buy. 
+                 // Even with conversion, the ratio is mostly preserved IF div price was constant, but it's not.
+                 // So we convert both.
+                 const cb = convertPrice(rb, item.buyDay, league);
+                 const cs = convertPrice(rs, item.sellDay, league);
+                 return cb > 0 ? (cs - cb) / cb : -9999;
+             };
+             valA = getVals(a);
+             valB = getVals(b);
+        } else {
+            // buy or sell
+            valA = convertPrice(rawA, type === 'buy' ? a.buyDay : a.sellDay, league);
+            valB = convertPrice(rawB, type === 'buy' ? b.buyDay : b.sellDay, league);
+        }
+      }
+
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
+      return 0;
+    });
+
+    return data;
+  }, [filteredTableData, sortConfig, convertPrice]); // convertPrice updated on filter change, ensuring sort uses correct currency
 
   const denom = Math.max(1, windowMax - 1);
 
@@ -347,7 +414,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <div className="h-4 w-px bg-white/50 mx-1" />
+            <div className="h-4 w-px bg-white/10 mx-1" />
             <div className="flex items-center gap-2">
               <button
                 className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-red-900/50 text-red-400 hover:bg-red-900 hover:text-white hover:border-red-600 min-w-[70px] transition-all"
@@ -359,7 +426,7 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
               <button
                 className="btn btn-xs sm:btn-sm bg-base-100 border-2 border-amber-900/50 text-amber-500 hover:bg-amber-700 hover:text-black hover:border-amber-500 min-w-[120px] transition-all"
                 onClick={() => {
-                  const top5 = filteredTableData.slice(0, 5).map((item) => item.name);
+                  const top5 = sortedTableData.slice(0, 5).map((item) => item.name);
                   setSelectedItemNames(top5);
                 }}
                 type="button"
@@ -372,21 +439,14 @@ const Dashboard = ({ filters, analysisRequested, apiSeries = [], apiError = "", 
 
         <div className="flex-1 overflow-auto relative">
           <ItemTable
-            data={filteredTableData}
+            data={sortedTableData}
             selectedItems={selectedItemNames}
             onToggleItem={toggleItemSelection}
             selectedSourceLeagues={filters.selectedSourceLeagues}
-            filters={filters} // Pass filters to allow conversion inside ItemTable if needed, or if we pass raw
-            // Actually, we are passing `data` which has `values` (raw) and `buyPrice`/`sellPrice` (converted).
-            // ItemTable logic needs to be updated to use conversion for the expanded columns.
-            // So we pass the `convertPrice` function or let ItemTable handle it?
-            // Better to pass `convertPrice` or `getDivinePrice` to ItemTable? 
-            // Or just pass the `currency` and `divinePriceMap`?
-            // Simpler: Dashboard handles data preparation.
-            // But ItemTable renders dynamic columns based on `selectedSourceLeagues`.
-            // So ItemTable needs access to conversion logic.
-            // I'll pass a `convertPrice` prop to ItemTable.
+            filters={filters} 
             convertPrice={convertPrice}
+            sortConfig={sortConfig}
+            onSort={handleSort}
           />
         </div>
       </div>

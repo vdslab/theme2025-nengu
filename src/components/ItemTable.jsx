@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, filters, convertPrice }) => {
+const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, filters, convertPrice, sortConfig, onSort }) => {
   const buyDay = data.length > 0 && data[0].buyDay ? data[0].buyDay : 'X';
   const sellDay = data.length > 0 && data[0].sellDay ? data[0].sellDay : 'Y';
   
@@ -13,6 +13,24 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
       return found ? found.price : 0;
   };
 
+  const SortIcon = ({ columnKey }) => {
+      if (sortConfig?.key !== columnKey) return <span className="opacity-20 ml-1">⇅</span>;
+      return <span className="ml-1 text-amber-500">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>;
+  };
+
+  const Th = ({ label, sortKey, className, style, children }) => (
+      <th 
+        className={`${className} cursor-pointer hover:bg-white/10 transition-colors select-none`} 
+        style={style}
+        onClick={() => onSort && onSort(sortKey)}
+      >
+          <div className="flex items-center justify-end w-full">
+            {children || label}
+            <SortIcon columnKey={sortKey} />
+          </div>
+      </th>
+  );
+
   return (
     <table className="table table-sm w-full min-w-[600px] border-separate border-spacing-0">
       <thead className="bg-base-300 text-base-content/70 sticky top-0 z-10 shadow-sm">
@@ -20,27 +38,51 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
           <th className="border-b border-r border-white/5 py-3 w-12 text-center bg-base-300">
             {/* Checkbox Header */}
           </th>
-          <th className="border-b border-r border-white/5 py-3 font-semibold first:rounded-tl-none bg-base-300 min-w-[200px]">Item Name</th>
+          
+          <th 
+            className="border-b border-r border-white/5 py-3 font-semibold first:rounded-tl-none bg-base-300 min-w-[200px] cursor-pointer hover:bg-white/10 transition-colors select-none"
+            onClick={() => onSort && onSort('name')}
+          >
+             <div className="flex items-center w-full">
+                Item Name
+                <SortIcon columnKey="name" />
+             </div>
+          </th>
           
           {hasLeagues ? (
               selectedSourceLeagues.map(league => (
                   <React.Fragment key={league}>
-                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap">
+                      <Th 
+                        className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap"
+                        sortKey={`${league}_buy`}
+                      >
                           Buy <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
-                      </th>
-                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap">
+                      </Th>
+                      <Th 
+                        className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap"
+                        sortKey={`${league}_sell`}
+                      >
                           Sell <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
-                      </th>
-                      <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[90px] whitespace-nowrap">
+                      </Th>
+                      <Th 
+                        className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[90px] whitespace-nowrap"
+                        sortKey={`${league}_roi`}
+                      >
                           ROI <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
-                      </th>
+                      </Th>
                   </React.Fragment>
               ))
           ) : (
               <>
-                <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300">Buy Price (Day {buyDay})</th>
-                <th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300">Sell Price (Day {sellDay})</th>
-                <th className="border-b border-white/5 text-right py-3 font-semibold bg-base-300">Predicted ROI</th>
+                <Th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" sortKey="buyPrice">
+                    Buy Price (Day {buyDay})
+                </Th>
+                <Th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" sortKey="sellPrice">
+                    Sell Price (Day {sellDay})
+                </Th>
+                <Th className="border-b border-white/5 text-right py-3 font-semibold bg-base-300" sortKey="roi">
+                    Predicted ROI
+                </Th>
               </>
           )}
         </tr>
