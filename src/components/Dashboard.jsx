@@ -171,7 +171,12 @@ const Dashboard = ({
   // チャートデータ生成
   useEffect(() => {
     const sourceLeagues = filters.selectedSourceLeagues || [];
-    const leaguesToShow = sourceLeagues.length > 0 ? sourceLeagues : ["Average"];
+    const leaguesToShow =
+      sourceLeagues.length > 0
+        ? sourceLeagues
+        : isKeepersLive
+        ? []
+        : ["Average"];
 
     const selectedSet = new Set(selectedItemNames.map(norm));
 
@@ -418,7 +423,14 @@ const Dashboard = ({
           </div>
 
           <span className="text-xs font-mono opacity-70 min-w-[90px] text-right">
-            {dayRange[0]} - {dayRange[1]}
+            {isKeepersLive ? (() => {
+              const formatDate = (d) => {
+                const date = new Date();
+                date.setDate(date.getDate() - (7 - d));
+                return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+              };
+              return `${formatDate(dayRange[0])} - ${formatDate(dayRange[1])}`;
+            })() : `${dayRange[0]} - ${dayRange[1]}`}
           </span>
         </div>
 

@@ -142,6 +142,17 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
     const xScale = d3.scaleLinear().domain(xDomain).range([0, width]);
     const yScale = d3.scaleLinear().domain([yMin, yMax]).range([height, 0]);
 
+    // Helper for formatting time labels (Day X or Date)
+    const isKeepers = filters.compareLeagues === "Keepers";
+    const formatTimeLabel = (d) => {
+      if (!isKeepers) return `Day ${d}`;
+      
+      // For Keepers, Day 7 is assumed to be today
+      const date = new Date();
+      date.setDate(date.getDate() - (7 - d));
+      // Format as M/D (e.g., 1/14)
+      return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+    };
 
     // Clip Path
     const clipId = `chart-area-clip-${Math.random().toString(36).slice(2)}`;
@@ -184,7 +195,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
 
     // Axes
     const unitSuffix = filters.currency === 'divine' ? 'div' : 'c';
-    const xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d => `Day ${d}`);
+    const xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d => formatTimeLabel(d));
     const yAxis = d3.axisLeft(yScale)
         .ticks(8)
         .tickFormat(d => chartMode === "roi" ? `${d > 0 ? '+' : ''}${d.toFixed(0)}%` : `${d3.format("~s")(d)}${unitSuffix}`);
@@ -278,7 +289,7 @@ const PriceChart = ({ data, filters, dayRange, colorDomain }) => {
             name: series.name,
             icon: series.icon, // Pass icon
             league: league,
-            day: v.day,
+            day: formatTimeLabel(v.day),
             price: chartMode === 'roi' ? v.originalPrice : v.value,
             roi: chartMode === 'roi' ? v.value : null,
             color: c,

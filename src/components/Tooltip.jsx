@@ -28,7 +28,7 @@ const Tooltip = ({ visible, x, y, name, icon, day, price, league, roi, unit = "c
       <div className="space-y-1 text-xs font-mono">
           <div className="flex justify-between gap-4">
               <span className="opacity-60">Time:</span>
-              <span className="font-bold">Day {day}</span>
+              <span className="font-bold">{day}</span>
           </div>
           <div className="flex justify-between gap-4">
               <span className="opacity-60">Price:</span>
