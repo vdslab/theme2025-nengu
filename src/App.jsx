@@ -64,10 +64,15 @@ function App() {
         const series = await fetchSeriesForLeagues({
           leaguesText,
           endpoint: "currencyoverview",
-          type: "Currency",
+          types: ["Currency", "Fragment"],
           pick: "receive",
           // windowDays は渡さない（全部ほしい）
         });
+        console.log(
+  "[App] fragment sample:",
+  series.filter((s) => s.sourceType === "Fragment").slice(0, 10)
+);
+
 
         console.log("[App] fetched api series:", series.length, series[0]);
 

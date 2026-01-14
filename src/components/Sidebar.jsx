@@ -67,7 +67,6 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
             className={[
               "input input-bordered input-primary join-item w-full",
               "text-center font-mono",
-              // スピナーを消して見た目の「埋まり」を回避
               "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
             ].join(" ")}
             placeholder={`${min}..${max}`}
@@ -83,14 +82,16 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
           </button>
         </div>
 
-        {hint ? (
-          <div className="text-[11px] opacity-50 mt-1">{hint}</div>
-        ) : null}
+        {hint ? <div className="text-[11px] opacity-50 mt-1">{hint}</div> : null}
       </div>
     );
   };
 
   const handleLeagueToggle = (league) => {
+    // Keepers中は過去リーグ選択不可（念のためガード）
+    const isKeepersOn = String(filters.compareLeagues ?? "").trim() === "Keepers";
+    if (isKeepersOn) return;
+
     const current = filters.selectedSourceLeagues || [];
     const newSelection = current.includes(league)
       ? current.filter((l) => l !== league)
@@ -105,16 +106,21 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
   const isKeepersOn = String(filters.compareLeagues ?? "").trim() === "Keepers";
 
   return (
-    // ★ overflow-hidden にして、中身をスクロール領域化
     <div className="p-4 h-full flex flex-col overflow-hidden">
       <h2 className="text-xl font-bold mb-6 text-primary">Divine Insight</h2>
 
-      {/* ★ここをスクロール可能に */}
       <div className="flex-1 overflow-y-auto pr-1">
         <h3 className="text-lg font-semibold mb-4">Investment Settings</h3>
 
         {/* Source Data Selection */}
-        <div className="mb-6 p-4 bg-black/40 rounded-xl border border-white/10 shadow-inner">
+        <div
+          className={[
+            "mb-6 p-4 rounded-xl border shadow-inner",
+            isKeepersOn
+              ? "bg-black/20 border-white/5 opacity-60"
+              : "bg-black/40 border-white/10",
+          ].join(" ")}
+        >
           <label className="block text-xs uppercase tracking-widest font-black mb-4 text-amber-500/80">
             Source Data (Past Leagues)
           </label>
@@ -137,15 +143,34 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
               return leaguesToList.map((config) => (
                 <label
                   key={config.id}
-                  className="flex items-center gap-3 cursor-pointer group"
+                  className={[
+                    "flex items-center gap-3 group",
+                    isKeepersOn ? "cursor-not-allowed" : "cursor-pointer",
+                  ].join(" ")}
+                  title={isKeepersOn ? "Keepers表示中は過去データを選択できません" : ""}
                 >
                   <input
                     type="checkbox"
-                    className="checkbox checkbox-sm border-2 border-white/20 bg-white/5 checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black] group-hover:border-amber-500/50 transition-all"
+                    disabled={isKeepersOn}
+                    className={[
+                      "checkbox checkbox-sm border-2 border-white/20 bg-white/5",
+                      "checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black]",
+                      "transition-all",
+                      isKeepersOn
+                        ? "opacity-40"
+                        : "group-hover:border-amber-500/50",
+                    ].join(" ")}
                     checked={(filters.selectedSourceLeagues || []).includes(config.id)}
                     onChange={() => handleLeagueToggle(config.id)}
                   />
-                  <span className="text-sm font-bold opacity-70 group-hover:opacity-100 group-hover:text-amber-200 transition-all">
+                  <span
+                    className={[
+                      "text-sm font-bold transition-all",
+                      isKeepersOn
+                        ? "opacity-50"
+                        : "opacity-70 group-hover:opacity-100 group-hover:text-amber-200",
+                    ].join(" ")}
+                  >
                     {config.label}
                   </span>
                 </label>
@@ -153,12 +178,18 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
             })()}
           </div>
 
-          <div className="text-[10px] opacity-40 mt-4 pl-1 leading-relaxed italic">
-            Select datasets to compare on the chart.
-          </div>
+          {isKeepersOn ? (
+            <div className="text-[10px] opacity-60 mt-4 pl-1 leading-relaxed italic">
+              Keepers（Live）表示中は比較条件を固定するため、過去リーグは選択できません。
+            </div>
+          ) : (
+            <div className="text-[10px] opacity-40 mt-4 pl-1 leading-relaxed italic">
+              Select datasets to compare on the chart.
+            </div>
+          )}
         </div>
 
-        {/* Live Data (poe.ninja) - ここは既存のままでOK */}
+        {/* Live Data (poe.ninja) */}
         <div className="mb-6">
           <label className="block text-xs uppercase tracking-widest font-black mb-3 text-amber-500/80">
             Live Data (poe.ninja API)
@@ -172,8 +203,12 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
                 </span>
                 <span className="text-sm font-bold text-white">Keepers</span>
               </div>
+
               <button
-                onClick={() => onFilterChange({ ...filters, compareLeagues: "" })}
+                onClick={() => {
+                  // Keepers解除
+                  onFilterChange({ ...filters, compareLeagues: "" });
+                }}
                 className="btn btn-circle btn-ghost btn-xs text-error hover:bg-error/20"
                 title="Remove live data"
                 type="button"
@@ -185,7 +220,12 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
             <button
               type="button"
               onClick={() => {
-                onFilterChange({ ...filters, compareLeagues: "Keepers" });
+                // Keepers ON + 過去リーグ選択をクリア（混在防止）
+                onFilterChange({
+                  ...filters,
+                  compareLeagues: "Keepers",
+                  selectedSourceLeagues: [],
+                });
                 onAnalyze();
               }}
               className="btn w-full bg-amber-500 hover:bg-amber-400 text-black border-none font-black shadow-[0_0_15px_rgba(245,158,11,0.2)]"
@@ -194,38 +234,39 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
             </button>
           )}
         </div>
-<div className="grid grid-cols-2 gap-3 mb-6">
-  <div>
-    <label htmlFor="buyDay" className="block text-sm font-medium mb-1">
-      Buy Day
-    </label>
-    <input
-      type="number"
-      id="buyDay"
-      name="buyDay"
-      value={filters.buyDay ?? ""}
-      onChange={handleChange}
-      className="input input-bordered input-primary w-full pr-3 bg-base-100 ring-1 ring-white/10"
-    />
-  </div>
 
-  <div>
-    <label htmlFor="sellDay" className="block text-sm font-medium mb-1">
-      Sell Day
-    </label>
-    <input
-      type="number"
-      id="sellDay"
-      name="sellDay"
-      value={filters.sellDay ?? ""}
-      onChange={handleChange}
-      className="input input-bordered input-primary w-full pr-3 bg-base-100 ring-1 ring-white/10"
-    />
-  </div>
-</div>
+        {/* Buy/Sell */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div>
+            <label htmlFor="buyDay" className="block text-sm font-medium mb-1">
+              Buy Day
+            </label>
+            <input
+              type="number"
+              id="buyDay"
+              name="buyDay"
+              value={filters.buyDay ?? ""}
+              onChange={handleChange}
+              className="input input-bordered input-primary w-full pr-3 bg-base-100 ring-1 ring-white/10"
+            />
+          </div>
 
+          <div>
+            <label htmlFor="sellDay" className="block text-sm font-medium mb-1">
+              Sell Day
+            </label>
+            <input
+              type="number"
+              id="sellDay"
+              name="sellDay"
+              value={filters.sellDay ?? ""}
+              onChange={handleChange}
+              className="input input-bordered input-primary w-full pr-3 bg-base-100 ring-1 ring-white/10"
+            />
+          </div>
+        </div>
 
-        {/* Budget Filter */}
+        {/* Budget & Currency */}
         <div className="mb-6 p-4 bg-base-300/50 rounded-xl border border-white/5">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-sm text-base-content/70 uppercase tracking-wider">
@@ -261,7 +302,12 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 
           <div className="flex gap-2">
             <div className="flex-1">
-              <label htmlFor="minPrice" className="block text-xs font-medium mb-1 opacity-70">Min Price</label>
+              <label
+                htmlFor="minPrice"
+                className="block text-xs font-medium mb-1 opacity-70"
+              >
+                Min Price
+              </label>
               <div className="relative">
                 <input
                   type="number"
@@ -273,12 +319,18 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
                   className="input input-sm input-bordered w-full pr-8 bg-black/20 focus:bg-black/40 font-mono text-right"
                 />
                 <span className="absolute right-2 top-1.5 text-xs opacity-30 pointer-events-none">
-                  {filters.currency === 'divine' ? 'div' : 'c'}
+                  {filters.currency === "divine" ? "div" : "c"}
                 </span>
               </div>
             </div>
+
             <div className="flex-1">
-              <label htmlFor="maxPrice" className="block text-xs font-medium mb-1 opacity-70">Max Price</label>
+              <label
+                htmlFor="maxPrice"
+                className="block text-xs font-medium mb-1 opacity-70"
+              >
+                Max Price
+              </label>
               <div className="relative">
                 <input
                   type="number"
@@ -290,19 +342,16 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
                   className="input input-sm input-bordered w-full pr-8 bg-black/20 focus:bg-black/40 font-mono text-right"
                 />
                 <span className="absolute right-2 top-1.5 text-xs opacity-30 pointer-events-none">
-                  {filters.currency === 'divine' ? 'div' : 'c'}
+                  {filters.currency === "divine" ? "div" : "c"}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-
-        {/* スクロール領域の下に少し余白（Analyzeに被らないように） */}
         <div className="h-4" />
       </div>
 
-      {/* 下の固定ボタン */}
       <button onClick={onAnalyze} className="btn btn-primary w-full mt-4">
         Analyze
       </button>
