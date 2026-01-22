@@ -67,75 +67,92 @@ const Dashboard = ({
   };
 
   return (
-    <div className="h-full flex flex-col p-4 gap-4 overflow-hidden relative">
-      {apiError && (
-        <div className="alert alert-error shadow-lg">
-          <div>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="stroke-current flex-shrink-0 h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>{apiError}</span>
+    // ✅ 右側全体をスクロール可能にする
+    <div className="h-full overflow-y-auto p-4">
+      <div className="min-h-full flex flex-col gap-4 relative">
+        {apiError && (
+          <div className="alert alert-error shadow-lg">
+            <div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="stroke-current flex-shrink-0 h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>{apiError}</span>
+            </div>
+          </div>
+        )}
+
+        {/* --- Chart --- */}
+        <div className="flex flex-col gap-2">
+          <ChartRangeBar
+            isKeepersLive={isKeepersLive}
+            windowPreset={windowPreset}
+            setWindowPreset={setWindowPreset}
+            windowMax={windowMax}
+            dayRange={dayRange}
+            setDayRange={setDayRange}
+          />
+
+          <div className="bg-base-200 rounded-lg shadow-inner overflow-hidden">
+            <PriceChart
+              data={chartData}
+              filters={filters}
+              dayRange={dayRange}
+              colorDomain={processedChartData.map((d) => d.name)}
+            />
           </div>
         </div>
-      )}
 
-      {/* --- Chart --- */}
-      <div className="h-[45%] flex flex-col min-h-[300px] gap-2">
-        <ChartRangeBar
-          isKeepersLive={isKeepersLive}
-          windowPreset={windowPreset}
-          setWindowPreset={setWindowPreset}
-          windowMax={windowMax}
-          dayRange={dayRange}
-          setDayRange={setDayRange}
-        />
+        {/* --- Table --- */}
+        {/* ✅ テーブルは潰れないように “最大高さ” を持たせる（中身は個別スクロール） */}
+        <div
+          className={[
+            "bg-base-200 rounded-lg shadow-xl overflow-hidden border border-white/5",
+            "flex flex-col",
+          ].join(" ")}
+          style={{
+            // 画面サイズに応じていい感じに（ここは好みで調整OK）
+            maxHeight: "min(560px, 60vh)",
+          }}
+        >
+          {/* ヘッダー固定 */}
+          <div className="shrink-0">
+            <TableHeaderBar
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onClear={() => setSelectedItemNames([])}
+              onSelectTop5={() =>
+                setSelectedItemNames(sortedTableData.slice(0, 5).map((i) => i.name))
+              }
+            />
+          </div>
 
-        <div className="flex-1 min-h-0 bg-base-200 rounded-lg shadow-inner overflow-hidden relative">
-          <PriceChart
-            data={chartData}
-            filters={filters}
-            dayRange={dayRange}
-            colorDomain={processedChartData.map((d) => d.name)}
-          />
+          {/* ✅ テーブル本体だけスクロール */}
+          <div className="flex-1 min-h-0 overflow-auto">
+            <ItemTable
+              data={sortedTableData}
+              selectedItems={selectedItemNames}
+              onToggleItem={toggleItemSelection}
+              selectedSourceLeagues={filters.selectedSourceLeagues}
+              filters={filters}
+              convertPrice={convertPrice}
+              sortConfig={sortConfig}
+              onSort={handleSort}
+            />
+          </div>
         </div>
+
+        <LoadingOverlay isLoading={isLoading} />
       </div>
-
-      {/* --- Table --- */}
-      <div className="flex-1 min-h-0 flex flex-col bg-base-200 rounded-lg shadow-xl overflow-hidden border border-white/5">
-        <TableHeaderBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onClear={() => setSelectedItemNames([])}
-          onSelectTop5={() =>
-            setSelectedItemNames(sortedTableData.slice(0, 5).map((i) => i.name))
-          }
-        />
-
-        <div className="flex-1 overflow-auto relative">
-          <ItemTable
-            data={sortedTableData}
-            selectedItems={selectedItemNames}
-            onToggleItem={toggleItemSelection}
-            selectedSourceLeagues={filters.selectedSourceLeagues}
-            filters={filters}
-            convertPrice={convertPrice}
-            sortConfig={sortConfig}
-            onSort={handleSort}
-          />
-        </div>
-      </div>
-
-      <LoadingOverlay isLoading={isLoading} />
     </div>
   );
 };
