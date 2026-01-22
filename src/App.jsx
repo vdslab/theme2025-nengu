@@ -26,7 +26,7 @@ function App() {
 
   const handleFilterChange = (newFilters) => {
     // Check if critical fields changed
-    const criticalKeys = ["compareLeagues", "buyDay", "sellDay", "minPrice", "maxPrice"];
+    const criticalKeys = ["compareLeagues", "buyDay", "sellDay", "minPrice", "maxPrice", "selectedSourceLeagues"];
     const hasCriticalChange = criticalKeys.some(k => filters[k] !== newFilters[k]);
 
     setFilters(newFilters);
