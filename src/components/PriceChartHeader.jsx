@@ -40,6 +40,18 @@ const PriceChartHeader = ({
           >
             Scatter
           </button>
+          <button
+            type="button"
+            className={[
+              "btn btn-xs no-animation px-4 rounded transition-all border-none",
+              viewType === "range"
+                ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+                : "bg-transparent text-base-content/50 hover:text-base-content/80",
+            ].join(" ")}
+            onClick={() => setViewType("range")}
+          >
+            Range
+          </button>
         </div>
 
         {/* Trendのときだけ Price / ROI% */}

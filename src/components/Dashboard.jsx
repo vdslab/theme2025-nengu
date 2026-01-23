@@ -113,6 +113,7 @@ const Dashboard = ({
           <div className="bg-base-200 rounded-lg shadow-inner overflow-hidden">
             <PriceChart
               data={chartData}
+              selectedItemNames={selectedItemNames}
               filters={filters}
               dayRange={dayRange}
               colorDomain={processedChartData.map((d) => d.name)}

@@ -4,9 +4,10 @@ import ChartViewport from "./ChartViewport";
 import PriceChartHeader from "./PriceChartHeader";
 import TrendChart from "./TrendChart";
 import ScatterChart from "./ScatterChart";
+import RangeChart from "./RangeChart";
 
-const PriceChart = ({ data, filters, dayRange }) => {
-  const [viewType, setViewType] = useState("trend"); // "trend" | "scatter"
+const PriceChart = ({ data, selectedItemNames, filters, dayRange }) => {
+  const [viewType, setViewType] = useState("trend"); // "trend" | "scatter" | "range"
   const [trendMode, setTrendMode] = useState("roi"); // "price" | "roi"
 
   const [tooltip, setTooltip] = useState({
@@ -39,6 +40,17 @@ const PriceChart = ({ data, filters, dayRange }) => {
 
   // 凡例は item name で統合
   const legendItems = useMemo(() => {
+    // For Range view, show all selected items
+    if (viewType === 'range') {
+        if (selectedItemNames && selectedItemNames.length > 0) {
+            return selectedItemNames.map(name => ({
+                name,
+                color: getColor(name)
+            }));
+        }
+        return [];
+    }
+
     const m = new Map();
     (data || []).forEach((s) => {
       if (!s?.name) return;
@@ -47,7 +59,7 @@ const PriceChart = ({ data, filters, dayRange }) => {
       }
     });
     return Array.from(m.values());
-  }, [data]);
+  }, [data, viewType, selectedItemNames]);
 
   // チャート領域は固定高さ（ヘッダーが伸びても潰れない）
   const CHART_HEIGHT = 320;
@@ -65,8 +77,9 @@ const PriceChart = ({ data, filters, dayRange }) => {
       <ChartViewport height={CHART_HEIGHT}>
         {({ width, height, containerRef }) => (
           <div className="relative w-full h-full" ref={containerRef}>
-            {viewType === "trend" ? (
+            {viewType === "trend" && (
               <TrendChart
+                key="trend"
                 data={data}
                 filters={filters}
                 dayRange={dayRange}
@@ -78,9 +91,25 @@ const PriceChart = ({ data, filters, dayRange }) => {
                 setTooltip={setTooltip}
                 hideTooltip={hideTooltip}
               />
-            ) : (
+            )}
+            {viewType === "scatter" && (
               <ScatterChart
+                key="scatter"
                 data={data}
+                filters={filters}
+                dayRange={dayRange}
+                width={width}
+                height={height}
+                containerRef={containerRef}
+                getColor={getColor}
+                setTooltip={setTooltip}
+                hideTooltip={hideTooltip}
+              />
+            )}
+            {viewType === "range" && (
+              <RangeChart
+                key="range"
+                selectedItemNames={selectedItemNames}
                 filters={filters}
                 dayRange={dayRange}
                 width={width}
