@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
+import { processedChartData, availableLeagues } from "../data/processedData.js";
 
 const ScatterChart = ({
   data,
@@ -21,35 +22,36 @@ const ScatterChart = ({
     return Number.isFinite(n) ? n : null;
   };
 
-  // 日次リターン σ（%）
-  const calcRiskStd = (values, range) => {
-    if (!Array.isArray(values) || values.length < 2) return null;
+  // Find item in processedChartData by name
+  const findItemData = (name) => {
+    return processedChartData.find(d => d.name === name);
+  };
 
-    const minD = range?.[0] ?? 1;
-    const maxD = range?.[1] ?? 30;
+  // ROI Risk Calculation (Standard Deviation of ROI across available leagues)
+  const calcRoiRisk = (itemName, buyDay, sellDay) => {
+    const item = findItemData(itemName);
+    if (!item || !item.leagues) return 0; // fallback
 
-    const sliced = values
-      .filter((v) => v.day >= minD && v.day <= maxD)
-      .sort((a, b) => a.day - b.day)
-      .map((v) => ({ day: v.day, price: Number(v.price) }))
-      .filter((v) => Number.isFinite(v.price) && v.price > 0);
+    const rois = availableLeagues
+      .map(league => {
+        const leagueValues = item.leagues[league];
+        const lBuy = findPrice(leagueValues, buyDay);
+        const lSell = findPrice(leagueValues, sellDay);
+        
+        if (lBuy !== null && lSell !== null && lBuy > 0) {
+           return (lSell - lBuy) / lBuy;
+        }
+        return null;
+      })
+      .filter(val => val !== null);
 
-    if (sliced.length < 2) return null;
-
-    const rets = [];
-    for (let i = 1; i < sliced.length; i++) {
-      const prev = sliced[i - 1].price;
-      const cur = sliced[i].price;
-      if (prev > 0) {
-        rets.push((cur - prev) / prev);
-      }
+    if (rois.length > 1) {
+      const mean = rois.reduce((a, b) => a + b, 0) / rois.length;
+      const variance = rois.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rois.length;
+      return Math.sqrt(variance) * 100; // Return as %
+    } else {
+       return 0; 
     }
-    if (rets.length < 2) return null;
-
-    const dev = d3.deviation(rets);
-    if (!Number.isFinite(dev)) return null;
-
-    return dev * 100; // %表記
   };
 
   const buildPoints = () => {
@@ -64,15 +66,16 @@ const ScatterChart = ({
       if (!buy || !sell) return;
 
       const roi = ((sell - buy) / buy) * 100;
-      const riskStd = calcRiskStd(values, dayRange);
-      if (!Number.isFinite(roi) || !Number.isFinite(riskStd)) return;
+      const riskStd = calcRoiRisk(series.name, buyDay, sellDay);
+      // Even if risk is 0, we plot it
+      if (!Number.isFinite(roi)) return;
 
       pts.push({
         name: series.name,
         icon: series.icon,
         league: series.league || "",
         roi,
-        riskStd,
+        riskStd, // This is now ROI Risk %
         buy,
         sell,
         buyDay,
@@ -100,7 +103,7 @@ const ScatterChart = ({
         .attr("text-anchor", "middle")
         .style("fill", "#A0AEC0")
         .style("font-size", "16px")
-        .text("No data for Scatter (need Buy/Sell prices + enough days for risk σ).");
+        .text("No data for Scatter (need Buy/Sell prices).");
       return;
     }
 
@@ -140,7 +143,7 @@ const ScatterChart = ({
     chart
       .append("g")
       .attr("transform", `translate(0,${ih})`)
-      .call(d3.axisBottom(x).ticks(10).tickFormat((d) => `${Number(d).toFixed(1)}%`))
+      .call(d3.axisBottom(x).ticks(10).tickFormat((d) => `±${Number(d).toFixed(1)}%`))
       .attr("color", "#718096")
       .style("font-size", "11px");
 
@@ -160,7 +163,7 @@ const ScatterChart = ({
       .attr("text-anchor", "end")
       .style("fill", "#94A3B8")
       .style("font-size", "11px")
-      .text("Risk (σ of daily returns)");
+      .text("Risk (ROI Standard Deviation)");
 
     chart
       .append("text")
@@ -210,7 +213,7 @@ const ScatterChart = ({
           price: d.sell, // Tooltipはprice欄があるので一旦 sell を見せる
           roi: d.roi,
           unit: filters.currency === "divine" ? "div" : "c",
-          riskStd: d.riskStd,
+          riskStd: d.riskStd, // This is now ROI Risk
         });
       })
       .on("mouseleave", hideTooltip);

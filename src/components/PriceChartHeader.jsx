@@ -75,14 +75,20 @@ const PriceChartHeader = ({
 
       {/* Legend: item name で統合（リーグは表示しない） */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 justify-end flex-1">
-        {legendItems.map((it) => (
-          <div key={it.name} className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: it.color }} />
-            <span className="text-[10px] font-medium text-base-content/70 whitespace-nowrap">
-              {it.name}
-            </span>
-          </div>
-        ))}
+        {legendItems.length > 10 ? (
+          <span className="text-[10px] font-medium text-base-content/30 italic">
+            Legend hidden (&gt;10 items selected)
+          </span>
+        ) : (
+          legendItems.map((it) => (
+            <div key={it.name} className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: it.color }} />
+              <span className="text-[10px] font-medium text-base-content/70 whitespace-nowrap">
+                {it.name}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

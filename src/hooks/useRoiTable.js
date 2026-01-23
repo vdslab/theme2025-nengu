@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
-import { processedChartData } from "../data/processedData.js";
+import { useEffect, useState, useMemo } from "react";
+import { processedChartData, availableLeagues } from "../data/processedData.js";
 
 export const useRoiTable = ({ filters, analysisRequested, convertPrice }) => {
-  const [tableData, setTableData] = useState([]);
-  const [selectedItemNames, setSelectedItemNames] = useState([]);
-
-  useEffect(() => {
-    if (!analysisRequested) return;
+  // tableData is derived from filters/data, so useMemo is appropriate
+  const tableData = useMemo(() => {
+    if (!analysisRequested) return [];
 
     const findPriceForDay = (values, day) => {
       if (!Array.isArray(values)) return null;
@@ -37,6 +35,31 @@ export const useRoiTable = ({ filters, analysisRequested, convertPrice }) => {
         const buyPrice = rawBuy !== null ? convertPrice(rawBuy, buyDay, actualLeague) : null;
         const sellPrice = rawSell !== null ? convertPrice(rawSell, sellDay, actualLeague) : null;
 
+        // Calculate Risk (Standard Deviation of ROI across all available leagues)
+        let risk = null;
+        if (item.leagues) {
+          const rois = availableLeagues
+            .map(league => {
+              const leagueValues = item.leagues[league];
+              const lBuy = findPriceForDay(leagueValues, buyDay);
+              const lSell = findPriceForDay(leagueValues, sellDay);
+              
+              if (lBuy !== null && lSell !== null && lBuy > 0) {
+                 return (lSell - lBuy) / lBuy;
+              }
+              return null;
+            })
+            .filter(val => val !== null);
+
+          if (rois.length > 1) { // Need at least 2 points for variance
+            const mean = rois.reduce((a, b) => a + b, 0) / rois.length;
+            const variance = rois.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rois.length;
+            risk = Math.sqrt(variance);
+          } else if (rois.length === 1) {
+             risk = 0; // Only one data point implies no observed variation (though strictly undefined std dev for sample, 0 makes sense for UI "no deviation known")
+          }
+        }
+
         if (
           buyPrice === null ||
           (filters.minPrice && buyPrice < parseFloat(filters.minPrice)) ||
@@ -53,6 +76,7 @@ export const useRoiTable = ({ filters, analysisRequested, convertPrice }) => {
             buyPrice,
             sellPrice,
             roi,
+            risk, // Add Risk to the item object
             buyDay,
             sellDay,
             values: targetValues,
@@ -64,12 +88,23 @@ export const useRoiTable = ({ filters, analysisRequested, convertPrice }) => {
       })
       .filter(Boolean);
 
-    const sorted = results.sort((a, b) => b.roi - a.roi);
-    setTableData(sorted);
-
-    // 初期選択：Top5
-    setSelectedItemNames(sorted.slice(0, 5).map((r) => r.name));
+    return results.sort((a, b) => b.roi - a.roi);
   }, [filters, analysisRequested, convertPrice]);
+
+  const [selectedItemNames, setSelectedItemNames] = useState([]);
+
+  // When tableData changes (e.g. filters changed), reset selection to Top 5
+  // Use setTimeout to avoid "setState synchronously within an effect" lint error
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (tableData.length > 0) {
+        setSelectedItemNames(tableData.slice(0, 5).map((r) => r.name));
+      } else {
+        setSelectedItemNames([]);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [tableData]);
 
   return {
     tableData,

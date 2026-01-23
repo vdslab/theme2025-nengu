@@ -1,11 +1,41 @@
 import React from 'react';
 
-const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, filters, convertPrice, sortConfig, onSort }) => {
+const SortIcon = ({ columnKey, sortConfig }) => {
+  if (sortConfig?.key !== columnKey) return <span className="opacity-20 ml-1">⇅</span>;
+  return <span className="ml-1 text-amber-500">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>;
+};
+
+const Th = ({ label, sortKey, className, style, children, onSort, sortConfig }) => (
+  <th 
+    className={`${className} cursor-pointer hover:bg-white/10 transition-colors select-none`} 
+    style={style}
+    onClick={() => onSort && onSort(sortKey)}
+  >
+      <div className="flex items-center justify-end w-full">
+        {children || label}
+        <SortIcon columnKey={sortKey} sortConfig={sortConfig} />
+      </div>
+  </th>
+);
+
+const getRiskColor = (risk) => {
+  if (risk === null || risk === undefined) return "text-base-content/30";
+  // risk is standard deviation of ROI (e.g., 0.1 for 10%)
+  // Map 0 -> 0.5 (50%) spread to Green -> Red
+  const val = Math.min(Math.max(risk, 0), 0.5); 
+  const hue = 120 - (val / 0.5) * 120; 
+  return { color: `hsl(${hue}, 80%, 60%)` };
+};
+
+const ItemTable = ({ data, selectedItems, onToggleItem, onSelectAll, selectedSourceLeagues, filters, convertPrice, sortConfig, onSort }) => {
   const buyDay = data.length > 0 && data[0].buyDay ? data[0].buyDay : 'X';
   const sellDay = data.length > 0 && data[0].sellDay ? data[0].sellDay : 'Y';
   
   const hasLeagues = selectedSourceLeagues && selectedSourceLeagues.length > 0;
   const unitLabel = filters?.currency === 'divine' ? 'div' : 'c';
+
+  const allSelected = data.length > 0 && data.every(item => selectedItems.includes(item.name));
+  const someSelected = data.some(item => selectedItems.includes(item.name)) && !allSelected;
 
   const getPrice = (values, day) => {
       if (!values || !Array.isArray(values)) return 0;
@@ -13,30 +43,18 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
       return found ? found.price : 0;
   };
 
-  const SortIcon = ({ columnKey }) => {
-      if (sortConfig?.key !== columnKey) return <span className="opacity-20 ml-1">⇅</span>;
-      return <span className="ml-1 text-amber-500">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>;
-  };
-
-  const Th = ({ label, sortKey, className, style, children }) => (
-      <th 
-        className={`${className} cursor-pointer hover:bg-white/10 transition-colors select-none`} 
-        style={style}
-        onClick={() => onSort && onSort(sortKey)}
-      >
-          <div className="flex items-center justify-end w-full">
-            {children || label}
-            <SortIcon columnKey={sortKey} />
-          </div>
-      </th>
-  );
-
   return (
     <table className="table table-sm w-full min-w-[600px] border-separate border-spacing-0">
       <thead className="bg-base-300 text-base-content/70 sticky top-0 z-10 shadow-sm">
         <tr>
           <th className="border-b border-r border-white/5 py-3 w-12 text-center bg-base-300">
-            {/* Checkbox Header */}
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm border-gray-500 bg-black/20 checked:bg-amber-500 checked:border-amber-500 [--chkbg:theme(colors.amber.500)] [--chkfg:black] hover:border-amber-400 transition-all"
+              checked={allSelected}
+              ref={input => { if (input) input.indeterminate = someSelected; }}
+              onChange={(e) => onSelectAll && onSelectAll(e.target.checked)}
+            />
           </th>
           
           <th 
@@ -45,7 +63,7 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
           >
              <div className="flex items-center w-full">
                 Item Name
-                <SortIcon columnKey="name" />
+                <SortIcon columnKey="name" sortConfig={sortConfig} />
              </div>
           </th>
           
@@ -55,18 +73,24 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
                       <Th 
                         className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap"
                         sortKey={`${league}_buy`}
+                        onSort={onSort}
+                        sortConfig={sortConfig}
                       >
                           Buy <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
                       </Th>
                       <Th 
                         className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[120px] whitespace-nowrap"
                         sortKey={`${league}_sell`}
+                        onSort={onSort}
+                        sortConfig={sortConfig}
                       >
                           Sell <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
                       </Th>
                       <Th 
                         className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[90px] whitespace-nowrap"
                         sortKey={`${league}_roi`}
+                        onSort={onSort}
+                        sortConfig={sortConfig}
                       >
                           ROI <span className="opacity-50 text-xs ml-1 font-normal">({league === "Average" ? "Avg" : league})</span>
                       </Th>
@@ -74,17 +98,41 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
               ))
           ) : (
               <>
-                <Th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" sortKey="buyPrice">
+                <Th 
+                  className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" 
+                  sortKey="buyPrice"
+                  onSort={onSort}
+                  sortConfig={sortConfig}
+                >
                     Buy Price (Day {buyDay})
                 </Th>
-                <Th className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" sortKey="sellPrice">
+                <Th 
+                  className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" 
+                  sortKey="sellPrice"
+                  onSort={onSort}
+                  sortConfig={sortConfig}
+                >
                     Sell Price (Day {sellDay})
                 </Th>
-                <Th className="border-b border-white/5 text-right py-3 font-semibold bg-base-300" sortKey="roi">
+                <Th 
+                  className="border-b border-r border-white/5 text-right py-3 font-semibold bg-base-300" 
+                  sortKey="roi"
+                  onSort={onSort}
+                  sortConfig={sortConfig}
+                >
                     Predicted ROI
                 </Th>
               </>
           )}
+
+          <Th 
+            className="border-b border-white/5 text-right py-3 font-semibold bg-base-300 min-w-[80px]" 
+            sortKey="risk"
+            onSort={onSort}
+            sortConfig={sortConfig}
+          >
+              Risk
+          </Th>
         </tr>
       </thead>
       <tbody className="divide-y divide-white/5">
@@ -154,16 +202,24 @@ const ItemTable = ({ data, selectedItems, onToggleItem, selectedSourceLeagues, f
                   <>
                     <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">{item.buyPrice.toFixed(2)}{unitLabel}</td>
                     <td className="text-right border-r border-white/5 font-mono text-sm text-base-content/80">{item.sellPrice.toFixed(2)}{unitLabel}</td>
-                    <td className={`text-right font-bold text-sm ${item.roi > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <td className={`text-right border-r border-white/5 font-bold text-sm ${item.roi > 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {(item.roi * 100).toFixed(1)}%
                     </td>
                   </>
               )}
+
+              {/* Risk Column */}
+              <td 
+                className="text-right font-bold text-sm font-mono border-l border-white/5 bg-black/10"
+                style={typeof getRiskColor(item.risk) === 'object' ? getRiskColor(item.risk) : {}}
+              >
+                  {item.risk !== null && item.risk !== undefined ? `±${(item.risk * 100).toFixed(1)}%` : '-'}
+              </td>
             </tr>
           ))
         ) : (
           <tr>
-            <td colSpan={hasLeagues ? 2 + (selectedSourceLeagues.length * 3) : 5} className="text-center p-12 text-base-content/30 italic">
+            <td colSpan={hasLeagues ? 3 + (selectedSourceLeagues.length * 3) : 6} className="text-center p-12 text-base-content/30 italic">
               No profitable items found for the selected criteria.
             </td>
           </tr>

@@ -66,6 +66,14 @@ const Dashboard = ({
     });
   };
 
+  const toggleSelectAll = (shouldSelectAll) => {
+    if (shouldSelectAll) {
+      setSelectedItemNames(sortedTableData.map(item => item.name));
+    } else {
+      setSelectedItemNames([]);
+    }
+  };
+
   return (
     // ✅ 右側全体をスクロール可能にする
     <div className="h-full overflow-y-auto p-4">
@@ -142,6 +150,7 @@ const Dashboard = ({
               data={sortedTableData}
               selectedItems={selectedItemNames}
               onToggleItem={toggleItemSelection}
+              onSelectAll={toggleSelectAll}
               selectedSourceLeagues={filters.selectedSourceLeagues}
               filters={filters}
               convertPrice={convertPrice}

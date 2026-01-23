@@ -35,7 +35,7 @@ export const useSortedTableData = ({ tableData, searchQuery, sortConfig, convert
       if (key === "name") {
         valA = a.name.toLowerCase();
         valB = b.name.toLowerCase();
-      } else if (["buyPrice", "sellPrice", "roi"].includes(key)) {
+      } else if (["buyPrice", "sellPrice", "roi", "risk"].includes(key)) {
         valA = a[key] ?? -Infinity;
         valB = b[key] ?? -Infinity;
       } else {
