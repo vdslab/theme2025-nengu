@@ -1,9 +1,97 @@
-import React from "react";
+import React, { useRef } from "react";
 import { availableLeagues } from "../data/processedData";
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
+// --- Components for Help ---
+
+const HelpIcon = ({ text, position = "tooltip-left", className = "" }) => (
+  // Force tooltip to specified direction
+  // Use z-50 to try to layer above other elements
+  <div 
+    className={`tooltip ${position} ${className} ml-1 align-middle z-50 before:whitespace-normal before:max-w-[10rem] before:text-left before:text-xs before:content-[attr(data-tip)]`} 
+    data-tip={text}
+  >
+    <button type="button" className="btn btn-xs btn-circle btn-ghost text-base-content/50 hover:text-info min-h-0 w-4 h-4 p-0">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+      </svg>
+    </button>
+  </div>
+);
+
+const GuideModal = ({ id }) => (
+  <dialog id={id} className="modal">
+    <div className="modal-box bg-base-100 border border-white/10 max-w-2xl">
+      <h3 className="font-bold text-xl text-primary mb-4 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+        </svg>
+        How to Use "Divine Insight"
+      </h3>
+      
+      <div className="py-4 space-y-6 text-sm text-base-content/80 leading-relaxed">
+        <section>
+          <h4 className="font-bold text-amber-500 mb-2">1. Set Conditions (Investment Settings)</h4>
+          <p>
+            First, configure your investment strategy in the sidebar.
+            <br/>
+            - <strong>Buy/Sell Day:</strong> Specify the day of the league you plan to buy and sell. The tool calculates ROI based on price changes during this period.
+            <br/>
+            - <strong>Budget:</strong> Set your minimum and maximum budget and choose your currency (Chaos or Divine).
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-bold text-amber-500 mb-2">2. Choose Data Sources</h4>
+          <p>
+            Decide which data to analyze.
+            <br/>
+            - <strong>Source Data:</strong> Select past leagues to see historical trends. "Average" combines data from recent leagues.
+            <br/>
+            - <strong>Live Data (Keepers):</strong> Fetch real-time data from the current league via poe.ninja API to find opportunities right now.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-bold text-amber-500 mb-2">3. Analyze & Discover</h4>
+          <p>
+            Click the <span className="badge badge-primary badge-sm">Analyze</span> button. 
+            The table will list items sorted by profitability (ROI). 
+            Select items from the table to compare them on the chart.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-bold text-amber-500 mb-2">4. Visual Analysis (Chart)</h4>
+          <p>
+            Use the chart to verify price movements.
+            <br/>
+            - <strong>Trend:</strong> Line chart showing daily price history.
+            <br/>
+            - <strong>Scatter:</strong> Risk vs. Reward plot.
+            <br/>
+            - <strong>Range:</strong> Displays the min/max price variance for selected items.
+          </p>
+        </section>
+      </div>
+
+      <div className="modal-action">
+        <form method="dialog">
+          <button className="btn">Got it</button>
+        </form>
+      </div>
+    </div>
+    <form method="dialog" className="modal-backdrop">
+      <button>close</button>
+    </form>
+  </dialog>
+);
+
+
 const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
+  const modalId = "guide_modal";
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     onFilterChange({
@@ -33,7 +121,7 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 
     return (
       <div className="mb-4">
-        <label htmlFor={name} className="block text-sm font-medium mb-1">
+        <label htmlFor={name} className="flex items-center text-sm font-medium mb-1">
           {label}
         </label>
 
@@ -107,7 +195,20 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 
   return (
     <div className="p-4 h-full flex flex-col overflow-hidden">
-      <h2 className="text-xl font-bold mb-6 text-primary">Divine Insight</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-primary">Divine Insight</h2>
+        <button 
+          className="btn btn-sm btn-circle btn-ghost text-amber-500 hover:bg-amber-500/10"
+          onClick={() => document.getElementById(modalId).showModal()}
+          title="How to use"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+          </svg>
+        </button>
+      </div>
+
+      <GuideModal id={modalId} />
 
       <div className="flex-1 overflow-y-auto pr-1">
         <h3 className="text-lg font-semibold mb-4">Investment Settings</h3>
@@ -121,9 +222,12 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
               : "bg-black/40 border-white/10",
           ].join(" ")}
         >
-          <label className="block text-xs uppercase tracking-widest font-black mb-4 text-amber-500/80">
-            Source Data (Past Leagues)
-          </label>
+          <div className="flex items-center mb-4">
+            <label className="block text-xs uppercase tracking-widest font-black text-amber-500/80">
+              Source Data (Past Leagues)
+            </label>
+            <HelpIcon text="Select historical league data to analyze past price trends. 'Average' combines data from the last 3 leagues to show typical market behavior." />
+          </div>
 
           <div className="space-y-3 ml-1">
             {(() => {
@@ -191,9 +295,12 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
 
         {/* Live Data (poe.ninja) */}
         <div className="mb-6">
-          <label className="block text-xs uppercase tracking-widest font-black mb-3 text-amber-500/80">
-            Live Data (poe.ninja API)
-          </label>
+          <div className="flex items-center mb-3">
+            <label className="block text-xs uppercase tracking-widest font-black text-amber-500/80">
+              Live Data (poe.ninja API)
+            </label>
+            <HelpIcon text="Fetch real-time market data from the current active league via poe.ninja API. Use this to find profitable flips right now." />
+          </div>
 
           {isKeepersOn ? (
             <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/40 rounded-xl shadow-lg shadow-amber-500/5">
@@ -238,9 +345,16 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
         {/* Buy/Sell */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div>
-            <label htmlFor="buyDay" className="block text-sm font-medium mb-1">
-              Buy Day
-            </label>
+            <div className="flex items-center mb-1">
+              <label htmlFor="buyDay" className="block text-sm font-medium">
+                Buy Day
+              </label>
+              <HelpIcon 
+                text="The day of the league (Day X) you plan to purchase the item. Early league prices are often lower." 
+                position="tooltip-bottom" 
+                className="before:left-0 before:translate-x-0"
+              />
+            </div>
             <input
               type="number"
               id="buyDay"
@@ -252,9 +366,12 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
           </div>
 
           <div>
-            <label htmlFor="sellDay" className="block text-sm font-medium mb-1">
-              Sell Day
-            </label>
+             <div className="flex items-center mb-1">
+              <label htmlFor="sellDay" className="block text-sm font-medium">
+                Sell Day
+              </label>
+              <HelpIcon text="The day of the league (Day X) you plan to sell. The tool calculates ROI based on the price difference between Buy and Sell days." />
+            </div>
             <input
               type="number"
               id="sellDay"
@@ -272,6 +389,7 @@ const Sidebar = ({ filters, onFilterChange, onAnalyze }) => {
             <h4 className="font-bold text-sm text-base-content/70 uppercase tracking-wider">
               Budget & Currency
             </h4>
+            <HelpIcon text="Filter the item list to show only items within your minimum and maximum budget, in your preferred currency." />
           </div>
 
           {/* Currency Toggle */}

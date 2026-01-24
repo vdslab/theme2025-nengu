@@ -16,42 +16,48 @@ const PriceChartHeader = ({
 
         {/* View Toggle: Trend / Scatter */}
         <div className="bg-black/40 p-1 rounded-lg flex gap-1 border border-white/10 shadow-lg">
-          <button
-            type="button"
-            className={[
-              "btn btn-xs no-animation px-4 rounded transition-all border-none",
-              viewType === "trend"
-                ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-                : "bg-transparent text-base-content/50 hover:text-base-content/80",
-            ].join(" ")}
-            onClick={() => setViewType("trend")}
-          >
-            Trend
-          </button>
-          <button
-            type="button"
-            className={[
-              "btn btn-xs no-animation px-4 rounded transition-all border-none",
-              viewType === "scatter"
-                ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-                : "bg-transparent text-base-content/50 hover:text-base-content/80",
-            ].join(" ")}
-            onClick={() => setViewType("scatter")}
-          >
-            Scatter
-          </button>
-          <button
-            type="button"
-            className={[
-              "btn btn-xs no-animation px-4 rounded transition-all border-none",
-              viewType === "range"
-                ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-                : "bg-transparent text-base-content/50 hover:text-base-content/80",
-            ].join(" ")}
-            onClick={() => setViewType("range")}
-          >
-            Range
-          </button>
+          <div className="tooltip tooltip-bottom z-50 before:whitespace-normal before:max-w-xs before:text-left before:text-white before:content-[attr(data-tip)]" data-tip="A line chart tracking the daily price history of items. Use this to spot long-term trends and stability.">
+            <button
+              type="button"
+              className={[
+                "btn btn-xs no-animation px-4 rounded transition-all border-none",
+                viewType === "trend"
+                  ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+                  : "bg-transparent text-base-content/50 hover:text-base-content/80",
+              ].join(" ")}
+              onClick={() => setViewType("trend")}
+            >
+              Trend
+            </button>
+          </div>
+          <div className="tooltip tooltip-bottom z-50 before:whitespace-normal before:max-w-xs before:text-left before:text-white before:content-[attr(data-tip)]" data-tip="A scatter plot visualizing Risk (horizontal) vs. ROI (vertical). Items in the top-left offer high returns with low risk.">
+            <button
+              type="button"
+              className={[
+                "btn btn-xs no-animation px-4 rounded transition-all border-none",
+                viewType === "scatter"
+                  ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+                  : "bg-transparent text-base-content/50 hover:text-base-content/80",
+              ].join(" ")}
+              onClick={() => setViewType("scatter")}
+            >
+              Scatter
+            </button>
+          </div>
+          <div className="tooltip tooltip-bottom z-50 before:whitespace-normal before:max-w-xs before:text-left before:text-white before:content-[attr(data-tip)]" data-tip="Displays the price variability (Min vs Max) for each day. Wider bands indicate volatile prices, narrower bands mean stability.">
+            <button
+              type="button"
+              className={[
+                "btn btn-xs no-animation px-4 rounded transition-all border-none",
+                viewType === "range"
+                  ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+                  : "bg-transparent text-base-content/50 hover:text-base-content/80",
+              ].join(" ")}
+              onClick={() => setViewType("range")}
+            >
+              Range
+            </button>
+          </div>
         </div>
 
         {/* Trendのときだけ Price / ROI% */}
