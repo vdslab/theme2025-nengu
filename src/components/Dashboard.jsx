@@ -38,6 +38,7 @@ const Dashboard = ({
     filters,
     analysisRequested,
     convertPrice,
+    apiSeries,
   });
 
   const { chartData } = useChartSeries({

@@ -26,7 +26,9 @@ function App() {
 
   const handleFilterChange = (newFilters) => {
     // Check if critical fields changed
-    const criticalKeys = ["compareLeagues", "buyDay", "sellDay", "minPrice", "maxPrice", "selectedSourceLeagues"];
+    // Only 'compareLeagues' requires a new API fetch.
+    // Other filters (days, prices, source selection) can be applied immediately on existing data.
+    const criticalKeys = ["compareLeagues"];
     const hasCriticalChange = criticalKeys.some(k => filters[k] !== newFilters[k]);
 
     setFilters(newFilters);
