@@ -6,6 +6,7 @@ const RangeChart = React.memo(({
   selectedItemNames,
   filters,
   dayRange,
+  mode = "price", // "price" | "roi"
   width,
   height,
   containerRef,
@@ -18,8 +19,10 @@ const RangeChart = React.memo(({
   const selectedKeys = selectedItemNames ? selectedItemNames.join(",") : "";
 
   // 1. Prepare Data: Calculate Min/Max/Avg per day for ALL selected items
-  const chartData = useMemo(() => {
+  // Combined logic for Price and ROI modes
+  const renderData = useMemo(() => {
     if (!selectedItemNames || selectedItemNames.length === 0) return [];
+    const buyDay = parseInt(filters.buyDay, 10) || 1;
     
     return selectedItemNames.map(targetName => {
         const itemData = processedChartData.find(d => d.name === targetName);
@@ -30,24 +33,62 @@ const RangeChart = React.memo(({
         const dailyStats = [];
 
         for (let d = minDay; d <= maxDay; d++) {
-            // Collect prices from all available leagues for this day
-            const prices = availableLeagues.map(league => {
+            // Collect values (Price or ROI) from all available leagues for this day
+            const values = availableLeagues.map(league => {
                 const leagueData = itemData.leagues[league];
                 if (!leagueData) return null;
-                const entry = leagueData.find(v => v.day === d);
-                return entry ? Number(entry.price) : null;
-            }).filter(p => p !== null && p > 0);
 
-            if (prices.length > 0) {
-                const min = Math.min(...prices);
-                const max = Math.max(...prices);
-                const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+                const entry = leagueData.find(v => v.day === d);
+                if (!entry) return null;
+                const currentPrice = Number(entry.price);
+
+                if (mode === "price") {
+                    return currentPrice;
+                } else {
+                    // ROI Mode: Calculate based on THIS league's buyDay price
+                    const buyEntry = leagueData.find(v => v.day === buyDay);
+                    const buyPrice = buyEntry ? Number(buyEntry.price) : null;
+                    
+                    if (!buyPrice || buyPrice <= 0) return null;
+                    return ((currentPrice - buyPrice) / buyPrice) * 100;
+                }
+            }).filter(v => v !== null && (mode === "roi" ? Number.isFinite(v) : v > 0));
+
+            if (values.length > 0) {
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const avg = values.reduce((a, b) => a + b, 0) / values.length;
                 
+                // For tooltip display (price mode needs original prices, roi mode acts as value)
+                // If ROI mode, we might want to know the "average price" too for display?
+                // But structure expects min/max/avg to be the plotted values.
+                // Let's add extra fields if needed, but for now plotting is primary.
+                
+                // If ROI mode, we also need 'originalAvg' for tooltip "Price" field?
+                // We can calculate avg price separately if needed, but let's see what tooltip uses.
+                // Tooltip uses: d.avg (for plot), d.originalAvg (for price display in ROI mode).
+                
+                let originalAvg = avg;
+                if (mode === "roi") {
+                     // Calculate average price separately for tooltip context
+                     const prices = availableLeagues.map(league => {
+                        const ld = itemData.leagues[league];
+                        const e = ld?.find(v => v.day === d);
+                        return e ? Number(e.price) : null;
+                     }).filter(p => p !== null && p > 0);
+                     if (prices.length > 0) {
+                         originalAvg = prices.reduce((a, b) => a + b, 0) / prices.length;
+                     } else {
+                         originalAvg = 0;
+                     }
+                }
+
                 dailyStats.push({
                     day: d,
                     min,
                     max,
                     avg,
+                    originalAvg, // Used for tooltip price display
                     item: targetName,
                     icon: itemData.icon
                 });
@@ -63,7 +104,11 @@ const RangeChart = React.memo(({
         };
     }).filter(d => d !== null);
 
-  }, [selectedKeys]); 
+  }, [selectedKeys, mode, filters.buyDay]); // Re-calculate when mode or buyDay changes
+
+  // Renamed chartData -> renderData logic above, so we don't need the second useMemo
+  // ... clean up old useMemo ...
+
 
   useEffect(() => {
     if (!svgRef.current || !width || !height) return;
@@ -71,7 +116,7 @@ const RangeChart = React.memo(({
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    if (chartData.length === 0) {
+    if (renderData.length === 0) {
       svg
         .append("text")
         .attr("x", width / 2)
@@ -79,7 +124,7 @@ const RangeChart = React.memo(({
         .attr("text-anchor", "middle")
         .style("fill", "#A0AEC0")
         .style("font-size", "16px")
-        .text("No historical data available for Range view.");
+        .text(mode === "roi" ? "Cannot calculate ROI (missing Buy Day data)." : "No historical data available.");
       return;
     }
 
@@ -92,7 +137,7 @@ const RangeChart = React.memo(({
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
     // Flatten stats for scale calculation
-    const allStats = chartData.flatMap(d => d.stats);
+    const allStats = renderData.flatMap(d => d.stats);
 
     // Scales
     // X Axis: Day Range
@@ -103,9 +148,19 @@ const RangeChart = React.memo(({
       .domain([xMin, xMax])
       .range([0, iw]);
 
-    // Y Axis: Price (include min and max in domain)
-    const yMin = d3.min(allStats, d => d.min) * 0.9;
-    const yMax = d3.max(allStats, d => d.max) * 1.1;
+    // Y Axis: Price or ROI
+    let yMin = d3.min(allStats, d => d.min);
+    let yMax = d3.max(allStats, d => d.max);
+
+    if (mode === "price") {
+        yMin = yMin * 0.9;
+        yMax = yMax * 1.1;
+    } else {
+        // ROI Mode: Add padding
+        const pad = (yMax - yMin) * 0.1 || 10;
+        yMin -= pad;
+        yMax += pad;
+    }
 
     const yScale = d3.scaleLinear()
       .domain([yMin, yMax])
@@ -127,10 +182,24 @@ const RangeChart = React.memo(({
 
     chart.append("g")
       .attr("class", "grid y-grid")
-      .call(yAxis)
+      .call(yAxis
+        .tickFormat(d => mode === "roi" ? `${d}%` : d)
+      )
       .style("stroke-opacity", 0.1)
       .style("stroke", "white")
       .selectAll("text").style("fill", "#9ca3af");
+
+    // Zero line for ROI
+    if (mode === "roi") {
+        chart.append("line")
+            .attr("x1", 0)
+            .attr("x2", iw)
+            .attr("y1", yScale(0))
+            .attr("y2", yScale(0))
+            .attr("stroke", "white")
+            .attr("stroke-opacity", 0.3)
+            .attr("stroke-dasharray", "4,4");
+    }
 
     // Generators
     const areaGenerator = d3.area()
@@ -145,7 +214,7 @@ const RangeChart = React.memo(({
       .curve(d3.curveMonotoneX);
 
     // Draw for each item
-    chartData.forEach(series => {
+    renderData.forEach(series => {
         const color = getColor ? getColor(series.name) : "#f59e0b";
 
         // Area (Min-Max Range)
@@ -215,7 +284,7 @@ const RangeChart = React.memo(({
       let minDistance = Infinity;
       let closestPoint = null;
 
-      chartData.forEach(series => {
+      renderData.forEach(series => {
           const index = bisectDay(series.stats, dayVal, 1);
           const d0 = series.stats[index - 1];
           const d1 = series.stats[index];
@@ -277,10 +346,14 @@ const RangeChart = React.memo(({
           name: d.item,
           icon: d.icon,
           day: `Day ${d.day}`,
-          price: d.avg, 
-          league: `Range: ${d.min.toFixed(1)} - ${d.max.toFixed(1)}`,
+          // Show original price even in ROI mode, show ROI in roi field
+          price: mode === "roi" ? d.originalAvg : d.avg, 
+          league: mode === "roi" 
+            ? `Range: ${d.min.toFixed(1)}% ~ ${d.max.toFixed(1)}%` 
+            : `Range: ${d.min.toFixed(1)} - ${d.max.toFixed(1)}`,
           unit: filters.currency === "divine" ? "div" : "c",
-          avgPrice: d.avg
+          // Pass ROI value if in ROI mode
+          roi: mode === "roi" ? d.avg : null
         });
       }
     }).on("mouseleave", () => {
@@ -289,7 +362,7 @@ const RangeChart = React.memo(({
         hideTooltip();
     });
 
-  }, [chartData, width, height, dayRange, filters, getColor]);
+  }, [renderData, width, height, dayRange, filters, getColor, mode]);
 
   return <svg ref={svgRef} width={width} height={height} className="block" />;
 });

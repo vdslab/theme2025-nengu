@@ -129,6 +129,7 @@ const PriceChart = ({ data, selectedItemNames, filters, dayRange, height = 320 }
                   selectedItemNames={selectedItemNames}
                   filters={filters}
                   dayRange={dayRange}
+                  mode={trendMode}
                   width={width}
                   height={height}
                   containerRef={containerRef}
