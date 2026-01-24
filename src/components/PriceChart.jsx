@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import Tooltip from "./Tooltip";
 import ChartViewport from "./ChartViewport";
 import PriceChartHeader from "./PriceChartHeader";
@@ -24,19 +24,29 @@ const PriceChart = ({ data, selectedItemNames, filters, dayRange }) => {
     riskStd: null, // scatter用
   });
 
-  const hideTooltip = () => {
+  const hideTooltip = useCallback(() => {
     setTooltip((t) => ({ ...t, visible: false }));
-  };
+  }, []);
 
   // name -> color（リーグが違っても同じ色）
-  const getColor = (name) => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const h = Math.abs(hash % 360);
-    return `hsl(${h}, 75%, 60%)`;
-  };
+  // Memoize getColor to prevent re-creation on every render (e.g. tooltip update),
+  // which causes child charts to re-run their effects and clear D3 elements.
+  const getColor = useMemo(() => {
+    const colorMap = new Map();
+    return (name) => {
+        if (!name) return "#ccc";
+        if (colorMap.has(name)) return colorMap.get(name);
+        
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const h = Math.abs(hash % 360);
+        const color = `hsl(${h}, 75%, 60%)`;
+        colorMap.set(name, color);
+        return color;
+    };
+  }, []); // Empty dependency array as it doesn't depend on external props
 
   // 凡例は item name で統合
   const legendItems = useMemo(() => {

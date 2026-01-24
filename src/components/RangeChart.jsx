@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useMemo } from "react";
 import * as d3 from "d3";
 import { processedChartData, availableLeagues } from "../data/processedData.js";
 
-const RangeChart = ({
+const RangeChart = React.memo(({
   selectedItemNames,
   filters,
   dayRange,
@@ -14,6 +14,8 @@ const RangeChart = ({
   hideTooltip,
 }) => {
   const svgRef = useRef(null);
+
+  const selectedKeys = selectedItemNames ? selectedItemNames.join(",") : "";
 
   // 1. Prepare Data: Calculate Min/Max/Avg per day for ALL selected items
   const chartData = useMemo(() => {
@@ -61,7 +63,7 @@ const RangeChart = ({
         };
     }).filter(d => d !== null);
 
-  }, [selectedItemNames]); 
+  }, [selectedKeys]); 
 
   useEffect(() => {
     if (!svgRef.current || !width || !height) return;
@@ -244,7 +246,8 @@ const RangeChart = ({
             .attr("y1", 0)
             .attr("y2", ih)
             .attr("stroke", "white")
-            .attr("stroke-opacity", 0.2);
+            .attr("stroke-opacity", 0.2)
+            .style("pointer-events", "none"); // Prevent event interference
 
         // Draw circles for Avg, Min, Max
         chart.selectAll(".focus-circle").remove();
@@ -262,7 +265,8 @@ const RangeChart = ({
                 .attr("r", 4)
                 .attr("fill", color)
                 .attr("fill-opacity", p.opacity)
-                .attr("stroke", "#000");
+                .attr("stroke", "#000")
+                .style("pointer-events", "none"); // Prevent event interference
         });
 
         // Set Tooltip
@@ -288,6 +292,6 @@ const RangeChart = ({
   }, [chartData, width, height, dayRange, filters, getColor]);
 
   return <svg ref={svgRef} width={width} height={height} className="block" />;
-};
+});
 
 export default RangeChart;

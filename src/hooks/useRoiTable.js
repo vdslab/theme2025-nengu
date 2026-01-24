@@ -163,6 +163,15 @@ export const useRoiTable = ({ filters, analysisRequested, convertPrice, apiSerie
         setSelectedItemNames((prevSelected) => {
           const newDataNames = new Set(tableData.map((d) => d.name));
           const stillValidSelection = prevSelected.filter((name) => newDataNames.has(name));
+          
+          // Bailout if selection hasn't changed
+          if (
+            prevSelected.length === stillValidSelection.length && 
+            prevSelected.every((val, index) => val === stillValidSelection[index])
+          ) {
+            return prevSelected;
+          }
+
           return stillValidSelection;
         });
       }
